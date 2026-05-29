@@ -1,0 +1,37 @@
+{
+  "name": "singularity-radar-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "tsc",
+    "build:client": "cd ../client && npm ci && npm run build",
+    "start": "node dist/index.js",
+    "postinstall": "cd ../client && npm ci",
+    "seed": "tsx src/db/seed.ts",
+    "fetch": "tsx src/services/fetcher.ts"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fast-xml-parser": "^5.0.8",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.11",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
