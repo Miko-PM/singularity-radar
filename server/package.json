@@ -5,11 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "npm run build:server && npm run build:client",
-    "build:server": "tsc",
-    "build:client": "cd ../client && npm ci && npm run build",
+    "build": "tsc",
     "start": "node dist/index.js",
-    "postinstall": "cd ../client && npm ci",
     "seed": "tsx src/db/seed.ts",
     "fetch": "tsx src/services/fetcher.ts"
   },

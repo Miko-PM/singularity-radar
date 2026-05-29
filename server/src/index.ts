@@ -2,8 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import { runSchema, runSeed } from './db/index.js';
 import { loadKeywords } from './services/tagger.js';
 import { fetchAll } from './services/fetcher.js';
@@ -14,8 +12,6 @@ import hotTopicsRouter from './routes/hotTopics.js';
 import sourcesRouter from './routes/sources.js';
 import adminRouter from './routes/admin.js';
 import pool from './db/index.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -37,14 +33,7 @@ app.use('/api/hot-topics', hotTopicsRouter);
 app.use('/api/sources', sourcesRouter);
 app.use('/api/admin', adminRouter);
 
-// 生产环境：服务前端静态文件（SPA fallback）
-if (process.env.NODE_ENV === 'production') {
-  const clientDist = join(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
-  app.get('*', (_req, res) => {
-    res.sendFile(join(clientDist, 'index.html'));
-  });
-}
+// 注：前端由 Vercel 独立部署，后端仅提供 API
 
 let server: ReturnType<typeof app.listen>;
 
@@ -68,17 +57,13 @@ async function start() {
     });
     console.log('[Server] Cron scheduled: 8:00, 12:00, 18:00, 22:00 UTC+8');
 
-    // 启动后立即触发首次抓取（串行等待，确保数据就绪后再接受请求）
-    console.log('[Server] Initial fetch on startup...');
-    try {
-      await fetchAll();
-      console.log('[Server] Initial fetch complete');
-    } catch (err) {
-      console.error('[Server] Initial fetch error (non-fatal):', err);
-    }
-
+    // 先启动服务器接受请求，再异步触发首次抓取（避免阻塞 Render 健康检查）
     server = app.listen(PORT, () => {
       console.log(`[Server] Running on http://localhost:${PORT}`);
+      // 首次抓取异步执行，不阻塞启动
+      fetchAll()
+        .then(() => console.log('[Server] Initial fetch complete'))
+        .catch(err => console.error('[Server] Initial fetch error (non-fatal):', err));
     });
   } catch (err) {
     console.error('[Server] Startup error:', err);

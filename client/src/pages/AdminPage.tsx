@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getToken, setToken, clearToken } from '../utils/api.ts';
+import { getToken, setToken, clearToken, API_BASE } from '../utils/api.ts';
 import { useTags } from '../hooks/useData.ts';
 
 interface Props {
@@ -37,7 +37,7 @@ export default function AdminPage({ onBack }: Props) {
   async function fetchStats() {
     setStatsLoading(true);
     try {
-      const res = await fetch('/api/admin/stats', {
+      const res = await fetch(`${API_BASE}/api/admin/stats`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const json = await res.json();
@@ -71,7 +71,7 @@ export default function AdminPage({ onBack }: Props) {
     setResult(null);
 
     try {
-      const res = await fetch('/api/admin/articles', {
+      const res = await fetch(`${API_BASE}/api/admin/articles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ export default function AdminPage({ onBack }: Props) {
     if (!confirm('确定全量重新打标签？')) return;
     setResult('重新打标签中…');
     try {
-      const res = await fetch('/api/admin/retag', {
+      const res = await fetch(`${API_BASE}/api/admin/retag`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -142,7 +142,7 @@ export default function AdminPage({ onBack }: Props) {
   async function handleFetch() {
     setResult('手动抓取中…');
     try {
-      const res = await fetch('/api/admin/fetch', {
+      const res = await fetch(`${API_BASE}/api/admin/fetch`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -161,7 +161,7 @@ export default function AdminPage({ onBack }: Props) {
   async function handleReheat() {
     setResult('重算热度中…');
     try {
-      const res = await fetch('/api/admin/reheat', {
+      const res = await fetch(`${API_BASE}/api/admin/reheat`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
       });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ApiResponse } from '../types/index.ts';
+import { API_BASE } from '../utils/api.ts';
 
 export function useGet<T>(url: string, deps: any[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -41,18 +42,18 @@ export function useGet<T>(url: string, deps: any[] = []) {
 
 export function useArticles(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
-  const url = `/api/articles${qs ? `?${qs}` : ''}`;
+  const url = `${API_BASE}/api/articles${qs ? `?${qs}` : ''}`;
   return useGet<any>(url, [qs]);
 }
 
 export function useHotTopics() {
-  return useGet<any[]>('/api/hot-topics');
+  return useGet<any[]>(`${API_BASE}/api/hot-topics`);
 }
 
 export function useTags() {
-  return useGet<any[]>('/api/tags');
+  return useGet<any[]>(`${API_BASE}/api/tags`);
 }
 
 export function useSources() {
-  return useGet<any[]>('/api/sources');
+  return useGet<any[]>(`${API_BASE}/api/sources`);
 }

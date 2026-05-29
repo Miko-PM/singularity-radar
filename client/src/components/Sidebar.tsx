@@ -1,4 +1,5 @@
 import { TabType } from '../types/index.ts';
+import { API_BASE } from '../utils/api.ts';
 import { useState, useEffect } from 'react';
 
 interface Props {
@@ -38,7 +39,7 @@ export default function Sidebar({
   const [hasFeatured, setHasFeatured] = useState(true);
   useEffect(() => {
     const abort = new AbortController();
-    fetch('/api/articles?filter=featured&limit=1', { signal: abort.signal })
+    fetch(`${API_BASE}/api/articles?filter=featured&limit=1`, { signal: abort.signal })
       .then(r => r.json())
       .then(d => { if (!abort.signal.aborted) setHasFeatured((d.data || []).length > 0); })
       .catch(() => {});

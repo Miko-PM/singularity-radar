@@ -58,10 +58,10 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(tag);
     }
 
-    // lang 筛选 — 仅中文（检测 Unicode CJK 字符）
+    // lang 筛选 — 仅中文（检测 Unicode CJK 字符，用字面字符范围而非 \u 转义）
     if (lang === 'zh') {
       where += ` AND (a.title ~ $${paramIdx++} OR a.summary ~ $${paramIdx++})`;
-      params.push('[\\u4e00-\\u9fff]', '[\\u4e00-\\u9fff]');
+      params.push('[一-鿿]', '[一-鿿]');
     }
 
     // days 筛选 — 限制最近 N 天

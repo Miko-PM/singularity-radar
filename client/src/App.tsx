@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TabType } from './types/index.ts';
+import { API_BASE } from './utils/api.ts';
 import Sidebar from './components/Sidebar.tsx';
 import HomePage from './pages/HomePage.tsx';
 import AdminPage from './pages/AdminPage.tsx';
@@ -18,10 +19,10 @@ export default function App() {
   const [tags, setTags] = useState<any[]>([]);
   useEffect(() => {
     const abort = new AbortController();
-    fetch('/api/sources', { signal: abort.signal })
+    fetch(`${API_BASE}/api/sources`, { signal: abort.signal })
       .then(r => r.json()).then(d => { if (!abort.signal.aborted) setSources(d.data || []); })
       .catch(() => {});
-    fetch('/api/tags', { signal: abort.signal })
+    fetch(`${API_BASE}/api/tags`, { signal: abort.signal })
       .then(r => r.json()).then(d => { if (!abort.signal.aborted) setTags(d.data || []); })
       .catch(() => {});
     return () => abort.abort();
