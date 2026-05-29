@@ -82,8 +82,8 @@ export default function Sidebar({
             onClick={() => { onTabChange(tab.key); onMobileClose(); }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 font-label
               ${activeTab === tab.key
-                ? 'bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/20'
-                : 'text-[#777] hover:text-[#ececeb] hover:bg-[#111] border border-transparent'
+                ? 'bg-[var(--gold-bg)]/10 text-[var(--gold)] border border-[var(--gold)]/20'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] border border-transparent'
               }`}
           >
             <span className="w-5 text-center">{tab.icon}</span>
@@ -95,14 +95,14 @@ export default function Sidebar({
       {/* Scrollable filter area */}
       <div className="flex-1 overflow-y-auto px-3">
         {/* 中文筛选（所有 Tab 均可用，默认选中） */}
-        <div className="py-3 border-t border-[#222]">
-            <p className="font-label text-[10px] text-[#555] tracking-wider uppercase px-3 mb-2">语言</p>
+        <div className="py-3 border-t border-[var(--border-primary)]">
+            <p className="font-label text-[10px] text-[var(--text-dim)] tracking-wider uppercase px-3 mb-2">语言</p>
             <button
               onClick={() => onChineseOnlyChange(!chineseOnly)}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all font-label border
                 ${chineseOnly
-                  ? 'bg-[#d4af37]/10 text-[#d4af37] border-[#d4af37]/20'
-                  : 'text-[#666] hover:text-[#ececeb] border-transparent hover:bg-[#111]'
+                  ? 'bg-[var(--gold-bg)]/10 text-[var(--gold)] border-[var(--gold)]/20'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] border-transparent hover:bg-[var(--bg-secondary)]'
                 }`}
             >
               <span>{chineseOnly ? '✓' : '○'}</span>
@@ -112,15 +112,15 @@ export default function Sidebar({
 
         {/* 筛选按钮 */}
         {!hasActiveFilter && (
-          <div className="py-3 border-t border-[#222]">
-            <p className="font-label text-[10px] text-[#555] tracking-wider uppercase px-3 mb-2">排序</p>
+          <div className="py-3 border-t border-[var(--border-primary)]">
+            <p className="font-label text-[10px] text-[var(--text-dim)] tracking-wider uppercase px-3 mb-2">排序</p>
             <div className="space-y-1">
               <button
                 onClick={() => onFilterChange('latest')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all duration-200 font-label border
                   ${activeFilter === 'latest'
-                    ? 'bg-[#d4af37]/10 text-[#d4af37] border-[#d4af37]/20'
-                    : 'text-[#666] hover:text-[#ececeb] border-transparent hover:bg-[#111]'
+                    ? 'bg-[var(--gold-bg)]/10 text-[var(--gold)] border-[var(--gold)]/20'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] border-transparent hover:bg-[var(--bg-secondary)]'
                   }`}
               >
                 最新情报
@@ -129,8 +129,8 @@ export default function Sidebar({
                 onClick={() => onFilterChange('hot')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all duration-200 font-label border
                   ${activeFilter === 'hot'
-                    ? 'bg-[#d4af37]/10 text-[#d4af37] border-[#d4af37]/20'
-                    : 'text-[#666] hover:text-[#ececeb] border-transparent hover:bg-[#111]'
+                    ? 'bg-[var(--gold-bg)]/10 text-[var(--gold)] border-[var(--gold)]/20'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] border-transparent hover:bg-[var(--bg-secondary)]'
                   }`}
               >
                 高热爆料
@@ -140,8 +140,8 @@ export default function Sidebar({
                   onClick={() => onFilterChange('featured')}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all duration-200 font-label border
                     ${activeFilter === 'featured'
-                      ? 'bg-[#d4af37]/10 text-[#d4af37] border-[#d4af37]/20'
-                      : 'text-[#666] hover:text-[#ececeb] border-transparent hover:bg-[#111]'
+                      ? 'bg-[var(--gold-bg)]/10 text-[var(--gold)] border-[var(--gold)]/20'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] border-transparent hover:bg-[var(--bg-secondary)]'
                     }`}
                 >
                   编辑精选
@@ -153,10 +153,10 @@ export default function Sidebar({
 
         {/* 清除筛选 */}
         {hasActiveFilter && (
-          <div className="py-3 border-t border-[#222]">
+          <div className="py-3 border-t border-[var(--border-primary)]">
             <button
               onClick={() => { onClearTag(); onSourceChange(''); }}
-              className="w-full text-xs text-[#d4af37] font-label px-3 py-2 rounded-lg border border-[#d4af37]/20 hover:bg-[#d4af37]/5 transition-colors"
+              className="w-full text-xs text-[var(--gold)] font-label px-3 py-2 rounded-lg border border-[var(--gold)]/20 hover:bg-[var(--gold-bg)]/5 transition-colors"
             >
               清除筛选
             </button>
@@ -165,13 +165,13 @@ export default function Sidebar({
 
         {/* 数据源筛选 - 按分类分组显示（仅显示当前 Tab 相关且有数据的数据源） */}
         {sourceCategories.size > 0 && (
-          <div className="py-3 border-t border-[#222]">
-            <p className="font-label text-[10px] text-[#555] tracking-wider uppercase px-3 mb-2">数据源</p>
+          <div className="py-3 border-t border-[var(--border-primary)]">
+            <p className="font-label text-[10px] text-[var(--text-dim)] tracking-wider uppercase px-3 mb-2">数据源</p>
             <div className="space-y-1">
               {Array.from(sourceCategories.entries()).map(([cat, srcs]) => (
                 <div key={cat}>
                   {srcs.length > 1 && (
-                    <p className="font-label text-[9px] text-[#444] uppercase tracking-wider px-3 mt-2 mb-1">
+                    <p className="font-label text-[9px] text-[var(--text-dark)] uppercase tracking-wider px-3 mt-2 mb-1">
                       {cat === 'opensource' ? '开源' : cat === 'paper' ? '论文' : cat === 'news' ? '资讯' : cat === 'podcast' ? '播客' : cat}
                     </p>
                   )}
@@ -181,8 +181,8 @@ export default function Sidebar({
                       onClick={() => onSourceChange(activeSource === s.slug ? '' : s.slug)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all font-label border
                         ${activeSource === s.slug
-                          ? 'bg-[#2F5496]/10 text-[#5b8dd9] border-[#2F5496]/30'
-                          : 'text-[#666] hover:text-[#ececeb] border-transparent hover:bg-[#111]'
+                          ? 'bg-[var(--blue-bg)]/10 text-[var(--blue)] border-[var(--blue-dark)]/30'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] border-transparent hover:bg-[var(--bg-secondary)]'
                         }`}
                     >
                       <span className="w-4 text-center text-[9px]">▸</span>
@@ -197,8 +197,8 @@ export default function Sidebar({
 
         {/* 标签筛选 */}
         {tags.length > 0 && (
-          <div className="py-3 border-t border-[#222]">
-            <p className="font-label text-[10px] text-[#555] tracking-wider uppercase px-3 mb-2">热门标签</p>
+          <div className="py-3 border-t border-[var(--border-primary)]">
+            <p className="font-label text-[10px] text-[var(--text-dim)] tracking-wider uppercase px-3 mb-2">热门标签</p>
             <div className="flex flex-wrap gap-1.5">
               {tags.slice(0, 20).map((t: any) => (
                 <button
@@ -206,13 +206,13 @@ export default function Sidebar({
                   onClick={() => onTagClick(t.name)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-label transition-all border
                     ${selectedTag === t.name
-                      ? 'bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30'
-                      : 'bg-transparent text-[#666] border-[#333] hover:border-[#d4af37]/30 hover:text-[#d4af37]/80'
+                      ? 'bg-[var(--gold-bg)]/15 text-[var(--gold)] border-[var(--gold)]/30'
+                      : 'bg-transparent text-[var(--text-muted)] border-[var(--border-secondary)] hover:border-[var(--gold)]/30 hover:text-[var(--gold)]/80'
                     }`}
                 >
                   #{t.name}
                   {t.article_count != null && (
-                    <span className="ml-1 text-[10px] text-[#555]">{t.article_count}</span>
+                    <span className="ml-1 text-[10px] text-[var(--text-dim)]">{t.article_count}</span>
                   )}
                 </button>
               ))}
@@ -222,8 +222,8 @@ export default function Sidebar({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 px-6 py-4 border-t border-[#222]">
-        <p className="font-label text-[10px] text-[#444]">
+      <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border-primary)]">
+        <p className="font-label text-[10px] text-[var(--text-dark)]">
           © 2025 Singularity Radar
         </p>
       </div>
@@ -233,13 +233,13 @@ export default function Sidebar({
   return (
     <>
       {/* Desktop */}
-      <aside className="hidden md:block w-64 xl:w-72 2xl:w-80 flex-shrink-0 self-start sticky top-16 h-[calc(100vh-4rem)] border-r border-[#222] bg-[#0c0c0c]">
+      <aside className="hidden md:block w-64 xl:w-72 2xl:w-80 flex-shrink-0 self-start sticky top-16 h-[calc(100vh-4rem)] border-r border-[var(--border-primary)] bg-[var(--bg-primary)]">
         {content}
       </aside>
 
       {/* Mobile */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-[#0c0c0c] border-r border-[#222] transform transition-transform duration-300 ease-in-out ${
+        className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-[var(--bg-primary)] border-r border-[var(--border-primary)] transform transition-transform duration-300 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

@@ -179,14 +179,14 @@ export default function AdminPage({ onBack }: Props) {
   // Login screen
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-[#0c0c0c] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
-          <button onClick={onBack} className="font-label text-xs text-[#666] hover:text-white mb-8 transition-colors">
+          <button onClick={onBack} className="font-label text-xs text-[var(--text-muted)] hover:text-white mb-8 transition-colors">
             ← 返回首页
           </button>
 
-          <h1 className="font-headline text-2xl text-[#d4af37] mb-2">管理员登录</h1>
-          <p className="text-sm text-[#666] mb-6 font-label">
+          <h1 className="font-headline text-2xl text-[var(--gold)] mb-2">管理员登录</h1>
+          <p className="text-sm text-[var(--text-muted)] mb-6 font-label">
             请输入管理员 Token
           </p>
 
@@ -201,13 +201,13 @@ export default function AdminPage({ onBack }: Props) {
             value={token}
             onChange={(e) => setTokenState(e.target.value)}
             placeholder="输入 Token…"
-            className="w-full bg-[#111] border border-[#333] rounded-lg px-4 py-2.5 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors font-label"
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors font-label"
             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
           />
           <button
             onClick={handleLogin}
             disabled={locked || token.length < 4}
-            className="w-full mt-3 py-2.5 bg-[#d4af37]/10 border border-[#d4af37]/20 text-[#d4af37] rounded-lg text-sm font-label hover:bg-[#d4af37]/15 transition-colors disabled:opacity-40"
+            className="w-full mt-3 py-2.5 bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] rounded-lg text-sm font-label hover:bg-[var(--gold-bg)]/15 transition-colors disabled:opacity-40"
           >
             确认
           </button>
@@ -218,14 +218,14 @@ export default function AdminPage({ onBack }: Props) {
 
   // Admin panel
   return (
-    <div className="min-h-screen bg-[#0c0c0c]">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Header */}
-      <header className="h-16 border-b border-[#222] flex items-center justify-between px-4 md:px-8">
-        <button onClick={onBack} className="font-label text-xs text-[#666] hover:text-white transition-colors">
+      <header className="h-16 border-b border-[var(--border-primary)] flex items-center justify-between px-4 md:px-8">
+        <button onClick={onBack} className="font-label text-xs text-[var(--text-muted)] hover:text-white transition-colors">
           ← 返回首页
         </button>
-        <h1 className="font-label text-sm text-[#d4af37]">管理员面板</h1>
-        <button onClick={handleLogout} className="font-label text-xs text-[#666] hover:text-red-400 transition-colors">
+        <h1 className="font-label text-sm text-[var(--gold)]">管理员面板</h1>
+        <button onClick={handleLogout} className="font-label text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors">
           退出
         </button>
       </header>
@@ -241,9 +241,9 @@ export default function AdminPage({ onBack }: Props) {
               { label: '热门议题', value: stats.total_topics },
               { label: '数据源', value: stats.active_sources },
             ].map((s) => (
-              <div key={s.label} className="bg-[#0e0e0e] border border-[#222] rounded-xl p-3 text-center">
-                <p className="font-label text-lg text-[#d4af37]">{s.value}</p>
-                <p className="font-label text-[10px] text-[#555] mt-0.5">{s.label}</p>
+              <div key={s.label} className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl p-3 text-center">
+                <p className="font-label text-lg text-[var(--gold)]">{s.value}</p>
+                <p className="font-label text-[10px] text-[var(--text-dim)] mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
@@ -251,13 +251,13 @@ export default function AdminPage({ onBack }: Props) {
 
         {/* Action buttons */}
         <div className="flex gap-3 mb-8 flex-wrap">
-          <button onClick={handleFetch} className="font-label text-xs px-4 py-2 rounded-lg bg-[#d4af37]/10 border border-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/15 transition-colors">
+          <button onClick={handleFetch} className="font-label text-xs px-4 py-2 rounded-lg bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] hover:bg-[var(--gold-bg)]/15 transition-colors">
             手动抓取
           </button>
-          <button onClick={handleRetag} className="font-label text-xs px-4 py-2 rounded-lg bg-[#111] border border-[#333] text-[#888] hover:text-white transition-colors">
+          <button onClick={handleRetag} className="font-label text-xs px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-secondary)] text-[var(--text-secondary)] hover:text-white transition-colors">
             全量重打标签
           </button>
-          <button onClick={handleReheat} className="font-label text-xs px-4 py-2 rounded-lg bg-[#111] border border-[#333] text-[#888] hover:text-white transition-colors">
+          <button onClick={handleReheat} className="font-label text-xs px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-secondary)] text-[var(--text-secondary)] hover:text-white transition-colors">
             重算热度
           </button>
         </div>
@@ -274,51 +274,51 @@ export default function AdminPage({ onBack }: Props) {
         )}
 
         {/* Submit form */}
-        <form onSubmit={handleSubmit} className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-5 md:p-6">
-          <h2 className="font-label text-xs text-[#888] tracking-wider uppercase mb-4">录入爆料</h2>
+        <form onSubmit={handleSubmit} className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl p-5 md:p-6">
+          <h2 className="font-label text-xs text-[var(--text-secondary)] tracking-wider uppercase mb-4">录入爆料</h2>
 
           <div className="space-y-4">
             <div>
-              <label className="font-label text-[11px] text-[#666] block mb-1">标题 *</label>
+              <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">标题 *</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors"
                 placeholder="文章标题"
                 required
               />
             </div>
 
             <div>
-              <label className="font-label text-[11px] text-[#666] block mb-1">原文链接 *</label>
+              <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">原文链接 *</label>
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors"
                 placeholder="https://"
                 required
               />
             </div>
 
             <div>
-              <label className="font-label text-[11px] text-[#666] block mb-1">摘要</label>
+              <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">摘要</label>
               <textarea
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 rows={3}
-                className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors resize-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors resize-none"
                 placeholder="简要描述…"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="font-label text-[11px] text-[#666] block mb-1">分类</label>
+                <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">分类</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] focus:outline-none focus:border-[#d4af37]/40 transition-colors"
+                  className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors"
                 >
                   <option value="opensource">GitHub 热榜</option>
                   <option value="paper">论文速递</option>
@@ -328,22 +328,22 @@ export default function AdminPage({ onBack }: Props) {
               </div>
 
               <div>
-                <label className="font-label text-[11px] text-[#666] block mb-1">配图 URL</label>
+                <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">配图 URL</label>
                 <input
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors"
+                  className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors"
                   placeholder="https://"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-label text-[11px] text-[#666] block mb-1">标签（逗号分隔）</label>
+              <label className="font-label text-[11px] text-[var(--text-muted)] block mb-1">标签（逗号分隔）</label>
               <input
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-[#ececeb] placeholder-[#555] focus:outline-none focus:border-[#d4af37]/40 transition-colors"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-secondary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--gold)]/40 transition-colors"
                 placeholder="LLM, Agent, 开源"
               />
             </div>
@@ -354,18 +354,18 @@ export default function AdminPage({ onBack }: Props) {
                   type="checkbox"
                   checked={isFeatured}
                   onChange={(e) => setIsFeatured(e.target.checked)}
-                  className="accent-[#d4af37]"
+                  className="accent-[var(--gold)]"
                 />
-                <span className="font-label text-[11px] text-[#888]">精选（Featured）</span>
+                <span className="font-label text-[11px] text-[var(--text-secondary)]">精选（Featured）</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isPinned}
                   onChange={(e) => setIsPinned(e.target.checked)}
-                  className="accent-[#d4af37]"
+                  className="accent-[var(--gold)]"
                 />
-                <span className="font-label text-[11px] text-[#888]">置顶（3天固定99°C）</span>
+                <span className="font-label text-[11px] text-[var(--text-secondary)]">置顶（3天固定99°C）</span>
               </label>
             </div>
           </div>
@@ -373,7 +373,7 @@ export default function AdminPage({ onBack }: Props) {
           <button
             type="submit"
             disabled={submitting || !title || !url}
-            className="mt-5 w-full py-2.5 bg-[#d4af37]/10 border border-[#d4af37]/20 text-[#d4af37] rounded-lg text-sm font-label hover:bg-[#d4af37]/15 transition-colors disabled:opacity-40"
+            className="mt-5 w-full py-2.5 bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] rounded-lg text-sm font-label hover:bg-[var(--gold-bg)]/15 transition-colors disabled:opacity-40"
           >
             {submitting ? '提交中…' : '发布'}
           </button>
@@ -382,10 +382,10 @@ export default function AdminPage({ onBack }: Props) {
         {/* Tags overview */}
         {tags && tags.length > 0 && (
           <div className="mt-8">
-            <h2 className="font-label text-xs text-[#888] tracking-wider uppercase mb-3">标签概览</h2>
+            <h2 className="font-label text-xs text-[var(--text-secondary)] tracking-wider uppercase mb-3">标签概览</h2>
             <div className="flex flex-wrap gap-2">
               {tags.map((tag: any) => (
-                <span key={tag.id} className="font-label text-xs px-2.5 py-1 rounded-full bg-[#1a1a1a] text-[#888] border border-[#333]">
+                <span key={tag.id} className="font-label text-xs px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-secondary)]">
                   #{tag.name} ({tag.article_count})
                 </span>
               ))}

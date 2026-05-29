@@ -74,13 +74,13 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
       {/* View toggle + time range */}
       <div className="flex items-center justify-between mb-4">
         {/* Time range filter */}
-        <div className="flex items-center gap-1 bg-[#0e0e0e] border border-[#222] rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg p-0.5">
           <button
             onClick={() => setTimeRange('week')}
             className={`px-3 py-1 rounded-md text-xs font-label transition-colors ${
               timeRange === 'week'
-                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                : 'text-[#666] hover:text-[#aaa]'
+                ? 'bg-[var(--gold-bg)]/15 text-[var(--gold)] border border-[var(--gold)]/30'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
           >
             近1周
@@ -89,8 +89,8 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
             onClick={() => setTimeRange('all')}
             className={`px-3 py-1 rounded-md text-xs font-label transition-colors ${
               timeRange === 'all'
-                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                : 'text-[#666] hover:text-[#aaa]'
+                ? 'bg-[var(--gold-bg)]/15 text-[var(--gold)] border border-[var(--gold)]/30'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
           >
             全部
@@ -98,13 +98,13 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
         </div>
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-1 bg-[#0e0e0e] border border-[#222] rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg p-0.5">
           <button
             onClick={() => setViewMode('list')}
             className={`px-3 py-1 rounded-md text-xs font-label transition-colors ${
               viewMode === 'list'
-                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                : 'text-[#666] hover:text-[#aaa]'
+                ? 'bg-[var(--gold-bg)]/15 text-[var(--gold)] border border-[var(--gold)]/30'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
           >
             列表
@@ -113,8 +113,8 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
             onClick={() => setViewMode('grid')}
             className={`px-3 py-1 rounded-md text-xs font-label transition-colors ${
               viewMode === 'grid'
-                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                : 'text-[#666] hover:text-[#aaa]'
+                ? 'bg-[var(--gold-bg)]/15 text-[var(--gold)] border border-[var(--gold)]/30'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
           >
             卡片
@@ -165,7 +165,7 @@ function FeaturedSection() {
 
   return (
     <div className="mb-8">
-      <h2 className="font-label text-xs text-[#555] tracking-wider uppercase mb-3">Featured Intel</h2>
+      <h2 className="font-label text-xs text-[var(--text-dim)] tracking-wider uppercase mb-3">Featured Intel</h2>
       <ArticleCard article={top} onTagClick={() => {}} />
     </div>
   );

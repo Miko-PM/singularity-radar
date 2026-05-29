@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Article } from '../types/index.ts';
-import { timeAgo, heatToColor, getPlaceholderImage, getCategoryLabel } from '../utils/index.ts';
+import { timeAgo, heatToColor, getCategoryLabel } from '../utils/index.ts';
 
 /** Image with load/error handling — spinner while loading, hide on error */
 function SafeImage({ src, alt, className, wrapperClass }: { src: string; alt: string; className: string; wrapperClass?: string }) {
@@ -11,8 +11,8 @@ function SafeImage({ src, alt, className, wrapperClass }: { src: string; alt: st
   return (
     <div className={wrapperClass}>
       {status === 'loading' && (
-        <div className="absolute inset-0 bg-[#111] flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-[#333] border-t-[#d4af37] rounded-full animate-spin" />
+        <div className="absolute inset-0 bg-[var(--bg-secondary)] flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-[var(--border-secondary)] border-t-[#d4af37] rounded-full animate-spin" />
         </div>
       )}
       <img
@@ -49,11 +49,11 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
         className="block group mb-6"
       >
         <article
-          className="bg-[#0e0e0e] border border-[#222] rounded-2xl overflow-hidden transition-all duration-300
-            group-hover:border-[#d4af37]/45 group-hover:-translate-y-0.5"
+          className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden transition-all duration-300
+            group-hover:border-[var(--gold)]/45 group-hover:-translate-y-0.5"
         >
           {hasImage && (
-            <div className="relative h-56 md:h-72 overflow-hidden bg-[#111]">
+            <div className="relative h-56 md:h-72 overflow-hidden bg-[var(--bg-secondary)]">
               <SafeImage
                 src={article.image_url}
                 alt=""
@@ -63,7 +63,7 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
               {/* Overlay gradient for readability */}
               <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-transparent to-transparent" />
               {/* Source badge */}
-              <span className="absolute top-4 left-4 font-label text-[11px] px-3 py-1 rounded-full bg-black/60 text-[#aaa] backdrop-blur-sm border border-white/10 z-10">
+              <span className="absolute top-4 left-4 font-label text-[11px] px-3 py-1 rounded-full bg-black/60 text-[var(--text-secondary)] backdrop-blur-sm border border-white/10 z-10">
                 {article.source_name || getCategoryLabel(article.category)}
               </span>
               {isAdmin && (
@@ -74,24 +74,24 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
             </div>
           )}
           <div className="p-6 md:p-8">
-            <h2 className="font-headline text-2xl md:text-3xl leading-tight text-[#ececeb] group-hover:text-[#d4af37] transition-colors duration-300 line-clamp-2">
+            <h2 className="font-headline text-2xl md:text-3xl leading-tight text-[var(--text-primary)] group-hover:text-[var(--gold)] transition-colors duration-300 line-clamp-2">
               {article.title}
             </h2>
             {article.summary && (
-              <p className="mt-3 text-sm text-[#777] leading-relaxed line-clamp-3 max-w-3xl">
+              <p className="mt-3 text-sm text-[var(--text-muted)] leading-relaxed line-clamp-3 max-w-3xl">
                 {article.summary}
               </p>
             )}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#222]">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border-primary)]">
               <div className="flex items-center gap-3">
                 <span className="font-label text-sm" style={{ color: heatToColor(article.hot_score) }}>
                   ● {article.hot_score}°C
                 </span>
-                <span className="text-xs text-[#555]">
+                <span className="text-xs text-[var(--text-dim)]">
                   via {article.source_name || getCategoryLabel(article.category)}
                 </span>
               </div>
-              <span className="font-label text-xs text-[#555]">
+              <span className="font-label text-xs text-[var(--text-dim)]">
                 {timeAgo(article.published_at)}
               </span>
             </div>
@@ -111,8 +111,8 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
         className="block group mb-4"
       >
         <article
-          className="bg-[#0e0e0e] border border-[#222] rounded-2xl transition-all duration-300
-            group-hover:border-[#d4af37]/45 group-hover:-translate-y-0.5"
+          className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl transition-all duration-300
+            group-hover:border-[var(--gold)]/45 group-hover:-translate-y-0.5"
         >
           <div className="flex flex-row">
             {/* Text area — left side */}
@@ -124,11 +124,11 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
                     爆料
                   </span>
                 )}
-                <h2 className="font-headline text-base md:text-lg leading-snug text-[#ececeb] group-hover:text-[#d4af37] transition-colors duration-300 line-clamp-2">
+                <h2 className="font-headline text-base md:text-lg leading-snug text-[var(--text-primary)] group-hover:text-[var(--gold)] transition-colors duration-300 line-clamp-2">
                   {article.title}
                 </h2>
                 {article.summary && (
-                  <p className="mt-2 text-sm text-[#777] leading-relaxed line-clamp-2">
+                  <p className="mt-2 text-sm text-[var(--text-muted)] leading-relaxed line-clamp-2">
                     {article.summary}
                   </p>
                 )}
@@ -146,7 +146,7 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
                           e.stopPropagation();
                           onTagClick(tag);
                         }}
-                        className="px-2 py-0.5 rounded-full bg-[#d4af37]/8 text-[#d4af37]/80 text-[11px] border border-[#d4af37]/15 cursor-pointer hover:bg-[#d4af37]/15 hover:text-[#d4af37] transition-colors font-label"
+                        className="px-2 py-0.5 rounded-full bg-[var(--gold-bg)]/8 text-[var(--gold)]/80 text-[11px] border border-[var(--gold)]/15 cursor-pointer hover:bg-[var(--gold-bg)]/15 hover:text-[var(--gold)] transition-colors font-label"
                       >
                         #{tag}
                       </span>
@@ -155,16 +155,16 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
                 )}
 
                 {/* Meta */}
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#222]">
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-primary)]">
                   <div className="flex items-center gap-2">
                     <span className="font-label text-xs" style={{ color: heatToColor(article.hot_score) }}>
                       ● {article.hot_score}°C
                     </span>
-                    <span className="text-[11px] text-[#555]">
+                    <span className="text-[11px] text-[var(--text-dim)]">
                       via {article.source_name || getCategoryLabel(article.category)}
                     </span>
                   </div>
-                  <span className="font-label text-[11px] text-[#555]">
+                  <span className="font-label text-[11px] text-[var(--text-dim)]">
                     {timeAgo(article.published_at)}
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
             {/* Image — floating frame on the right */}
             {hasImage && (
               <div className="w-28 md:w-44 shrink-0 p-3 md:p-4 pl-0 self-center">
-                <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-[#333] bg-[#111] shadow-lg">
+                <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-[var(--border-secondary)] bg-[var(--bg-secondary)] shadow-lg">
                   <SafeImage
                     src={article.image_url}
                     alt=""
@@ -199,12 +199,12 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
       className={`block group ${variant === 'compact' ? 'mb-3' : 'mb-5'}`}
     >
       <article
-        className={`bg-[#0e0e0e] border border-[#222] rounded-2xl overflow-hidden transition-all duration-300
-          group-hover:border-[#d4af37]/45 group-hover:-translate-y-0.5`}
+        className={`bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden transition-all duration-300
+          group-hover:border-[var(--gold)]/45 group-hover:-translate-y-0.5`}
       >
         {/* Image - 无图时完全隐藏 */}
         {hasImage && (
-          <div className="relative h-40 md:h-48 overflow-hidden bg-[#111]">
+          <div className="relative h-40 md:h-48 overflow-hidden bg-[var(--bg-secondary)]">
             <SafeImage
               src={article.image_url}
               alt=""
@@ -212,7 +212,7 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
               wrapperClass="absolute inset-0"
             />
             {/* Source badge */}
-            <span className="absolute top-3 left-3 font-label text-[10px] px-2 py-0.5 rounded-full bg-black/60 text-[#aaa] backdrop-blur-sm border border-white/10">
+            <span className="absolute top-3 left-3 font-label text-[10px] px-2 py-0.5 rounded-full bg-black/60 text-[var(--text-secondary)] backdrop-blur-sm border border-white/10">
               {article.source_name || getCategoryLabel(article.category)}
             </span>
             {/* Admin badge */}
@@ -226,12 +226,12 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
 
         {/* Content */}
         <div className="p-4 md:p-5">
-          <h2 className={`font-headline text-lg md:text-xl leading-snug text-[#ececeb] group-hover:text-[#d4af37] transition-colors duration-300 ${variant === 'compact' ? 'line-clamp-1' : 'line-clamp-2'}`}>
+          <h2 className={`font-headline text-lg md:text-xl leading-snug text-[var(--text-primary)] group-hover:text-[var(--gold)] transition-colors duration-300 ${variant === 'compact' ? 'line-clamp-1' : 'line-clamp-2'}`}>
             {article.title}
           </h2>
 
           {variant === 'default' && article.summary && (
-            <p className="mt-2 text-sm text-[#777] leading-relaxed line-clamp-2">
+            <p className="mt-2 text-sm text-[var(--text-muted)] leading-relaxed line-clamp-2">
               {article.summary}
             </p>
           )}
@@ -247,13 +247,13 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
                     e.stopPropagation();
                     onTagClick(tag);
                   }}
-                  className="px-2 py-0.5 rounded-full bg-[#d4af37]/8 text-[#d4af37]/80 text-[11px] border border-[#d4af37]/15 cursor-pointer hover:bg-[#d4af37]/15 hover:text-[#d4af37] transition-colors font-label"
+                  className="px-2 py-0.5 rounded-full bg-[var(--gold-bg)]/8 text-[var(--gold)]/80 text-[11px] border border-[var(--gold)]/15 cursor-pointer hover:bg-[var(--gold-bg)]/15 hover:text-[var(--gold)] transition-colors font-label"
                 >
                   #{tag}
                 </span>
               ))}
               {article.tags.length > 4 && (
-                <span className="text-[11px] text-[#555] font-label self-center">
+                <span className="text-[11px] text-[var(--text-dim)] font-label self-center">
                   +{article.tags.length - 4}
                 </span>
               )}
@@ -261,16 +261,16 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
           )}
 
           {/* Meta */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#222]">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-primary)]">
             <div className="flex items-center gap-2">
               <span className="font-label text-xs" style={{ color: heatToColor(article.hot_score) }}>
                 ● {article.hot_score}°C
               </span>
-              <span className="text-[11px] text-[#555]">
+              <span className="text-[11px] text-[var(--text-dim)]">
                 via {article.source_name || getCategoryLabel(article.category)}
               </span>
             </div>
-            <span className="font-label text-[11px] text-[#555]">
+            <span className="font-label text-[11px] text-[var(--text-dim)]">
               {timeAgo(article.published_at)}
             </span>
           </div>

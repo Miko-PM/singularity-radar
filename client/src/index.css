@@ -1,11 +1,60 @@
 @import "tailwindcss";
 
+/* ===== Theme Variables ===== */
+:root {
+  /* Dark theme (default) */
+  --bg-primary: #0c0c0c;
+  --bg-secondary: #111;
+  --bg-tertiary: #0e0e0e;
+  --bg-elevated: #1a1a1a;
+  --text-primary: #ececeb;
+  --text-secondary: #888;
+  --text-muted: #666;
+  --text-dim: #555;
+  --text-dark: #444;
+  --text-inverse: #0c0c0c;
+  --border-primary: #222;
+  --border-secondary: #333;
+  --gold: #d4af37;
+  --gold-bg: #d4af37;
+  --gold-bright: #f5f0e0;
+  --gold-gradient-2: #e8c84a;
+  --gold-gradient-3: #f5f0e0;
+  --blue: #5b8dd9;
+  --blue-dark: #2F5496;
+  --blue-bg: #2F5496;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f9f9ff;
+  --bg-secondary: #f1f3ff;
+  --bg-tertiary: #e9edff;
+  --bg-elevated: #ffffff;
+  --text-primary: #141b2b;
+  --text-secondary: #4e4636;
+  --text-muted: #6b7280;
+  --text-dim: #9ca3af;
+  --text-dark: #d1d5db;
+  --text-inverse: #ffffff;
+  --border-primary: #e5e7eb;
+  --border-secondary: #d2c5b0;
+  --gold: #775700;
+  --gold-bg: #f0bf56;
+  --gold-bright: #f0bf56;
+  --gold-gradient-2: #966e01;
+  --gold-gradient-3: #f0bf56;
+  --blue: #3755c3;
+  --blue-dark: #173bab;
+  --blue-bg: #dde1ff;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0c0c0c;
-  color: #ececeb;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Font utilities */
@@ -26,11 +75,16 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--text-dim);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--text-muted);
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.15s ease;
 }
 
 /* Skeleton pulse animation */
