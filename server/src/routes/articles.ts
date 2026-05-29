@@ -58,11 +58,8 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(tag);
     }
 
-    // lang 筛选 — 仅中文（检测 Unicode CJK 字符，用字面字符范围而非 \u 转义）
-    if (lang === 'zh') {
-      where += ` AND (a.title ~ $${paramIdx++} OR a.summary ~ $${paramIdx++})`;
-      params.push('[一-鿿]', '[一-鿿]');
-    }
+    // lang 筛选 — 仅中文（数据库正则不支持 CJK 范围，在 JS 层过滤）
+    // 在 JavaScript 中 /[\u4e00-\u9fff]/ 是可靠的中文检测方式
 
     // days 筛选 — 限制最近 N 天
     if (days) {
@@ -115,10 +112,18 @@ router.get('/', async (req: Request, res: Response) => {
       if (!tagMap.has(row.article_id)) tagMap.set(row.article_id, []);
       tagMap.get(row.article_id)!.push(row.name);
     }
-    const articles = dataRes.rows.map(a => ({
+    let articles = dataRes.rows.map(a => ({
       ...a,
       tags: tagMap.get(a.id) || [],
     }));
+
+    // lang=zh 应用层过滤（PostgreSQL POSIX 正则不支持 CJK Unicode 范围）
+    if (lang === 'zh') {
+      const cjk = /[\u4e00-\u9fff]/;
+      articles = articles.filter(a => cjk.test(a.title) || cjk.test(a.summary || ''));
+    }
+
+    const adjustedTotal = lang === 'zh' ? articles.length : total;
 
     const response: ApiResponse<typeof articles> = {
       data: articles,
@@ -126,8 +131,8 @@ router.get('/', async (req: Request, res: Response) => {
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
+        total: adjustedTotal,
+        totalPages: Math.ceil(adjustedTotal / limitNum),
       },
     };
 
