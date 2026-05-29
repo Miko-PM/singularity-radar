@@ -43,6 +43,8 @@ async function start() {
     // 数据库初始化
     console.log('[Server] Applying schema...');
     await runSchema();
+    console.log('[Server] Seeding initial data...');
+    await runSeed();
     console.log('[Server] Loading tag keywords...');
     await loadKeywords();
 
