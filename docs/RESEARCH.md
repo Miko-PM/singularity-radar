@@ -49,17 +49,17 @@
 |------|---------|------|
 | 前端框架 | React 19 + Vite 6 + Tailwind CSS v4 | 同一套代码响应式适配 PC/移动端；主题模式通过 CSS 变量 + localStorage 实现 |
 | 后端 | Node.js + Express | 轻量 API 服务 |
-| 数据库 | PostgreSQL（Render 内置） | 与后端同服务，无需额外管理 |
+| 数据库 | PostgreSQL（Supabase 免费版） | 500MB 存储，SSL 连接，与后端分离部署 |
 | 定时任务 | node-cron | 内置于后端进程，RSS 抓取顺序执行（非并行） |
 | 前端部署 | Vercel（自定义域名） | `https://sr.miko-ai.cn/` |
 | 后端部署 | Render（免费版） | 15 分钟无流量休眠，UptimeRobot 保活 |
 | 保活监控 | UptimeRobot | 每 5 分钟 ping /api/health，防止服务休眠 |
 | 数据获取 | RSS + HTML Scraper | RSS（arXiv/36氪/雷峰网/播客）+ HTML Scraper（GitHub Trending） |
 
-### 数据库说明：PostgreSQL（Render 内置）
+### 数据库说明：PostgreSQL（Supabase 免费版）
 
-- 使用 Render 内置 PostgreSQL，与后端同平台部署
-- 连接方式：`DATABASE_URL` 环境变量
+- 使用 Supabase 免费版（500MB 存储），内置 PostgreSQL，SSL 连接
+- 连接方式：`DATABASE_URL` 环境变量（Supabase 连接池字符串）
 - 使用 `pg`（node-postgres）驱动，连接池模式
 - **关键约定：RSS 抓取任务顺序执行（非并行）**，避免数据库连接争抢
 - V1.0 数据量：每天 4 次抓取，每次 ~50 条，月均 ~6000 条
@@ -73,7 +73,7 @@
 | `RSSHUB_BASE` | RSSHub 主实例地址 | `https://rsshub.app` |
 | `RSSHUB_FALLBACK` | RSSHub 备用实例 | `https://rsshub.bili.xyz` |
 | `PORT` | 后端端口 | 3001 |
-| `DATABASE_URL` | Render PostgreSQL 连接字符串 | 必填 |
+| `DATABASE_URL` | Supabase PostgreSQL 连接字符串 | 必填 |
 | `NODE_ENV` | 环境模式 | 生产环境为 `production` |
 
 ### API 接口清单
@@ -116,7 +116,7 @@
                   ↓
           REST API → https://singularity-radar-api.onrender.com (Render)
                   ↓
-            Render PostgreSQL
+            Supabase PostgreSQL
 
 保活: UptimeRobot → 每5分钟 GET /api/health → 保持 Render 服务在线
 ```

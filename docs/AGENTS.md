@@ -18,9 +18,9 @@ AI 资讯聚合平台，自动采集 GitHub Trending、arXiv、AI 新闻（36氪
 | 前端 | React 19 + Vite 6 + TypeScript | 同一代码库响应式适配 PC + 移动端 |
 | 样式 | Tailwind CSS v4 + CSS 变量 | 暗色/亮色模式 |
 | 后端 | Node.js + Express + TypeScript | 轻量 API，无 ORM |
-| 数据库 | PostgreSQL（Render 内置） | 使用 `pg`（node-postgres）驱动 |
+| 数据库 | PostgreSQL（Supabase 免费版） | 使用 `pg`（node-postgres）驱动 |
 | 定时任务 | node-cron | 内置于后端进程，UTC+8 8/12/18/22 执行 |
-| 部署 | Vercel（前端，自定义域名）+ Render（后端 + PostgreSQL） | |
+| 部署 | Vercel（前端，自定义域名）+ Render（后端）+ Supabase PostgreSQL（数据库） | |
 | 保活监控 | UptimeRobot | 每 5 分钟 ping /api/health，防止 Render 休眠 |
 
 ## 项目结构
@@ -188,7 +188,7 @@ recency_boost（时间衰减）:
 ### 后端（Render）
 - Web Service 类型
 - 环境变量：
-  - `DATABASE_URL` — Render PostgreSQL 连接字符串
+  - `DATABASE_URL` — Supabase PostgreSQL 连接字符串
   - `ADMIN_TOKEN` — 管理员 Token
   - `CACHE_TTL` — 缓存时间（默认 72）
   - `RSSHUB_BASE` — RSSHub 主实例

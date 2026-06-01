@@ -156,7 +156,7 @@ graph LR
         KEEPALIVE[UptimeRobot 保活<br/>5min/次 ping /api/health]
     end
 
-    subgraph Storage["Database · Render PostgreSQL"]
+    subgraph Storage["Database · Supabase PostgreSQL"]
         PG[(PostgreSQL)]
     end
 
@@ -220,7 +220,7 @@ flowchart TD
                   ↓
           REST API → https://singularity-radar-api.onrender.com (Render)
                   ↓
-            Render PostgreSQL
+            Supabase PostgreSQL (SSL)
 
 保活: UptimeRobot → 每5分钟 ping /api/health → 防止 Render 休眠
 ```
@@ -630,7 +630,7 @@ recency_boost（时间衰减）:
 - **并发抓取冲突**：PostgreSQL 原生支持并发读写，无需特殊配置
 - **URL 重复**：以 URL 为唯一约束，`ON CONFLICT` 自动更新
 - **部署后首次运行**：启动时触发首次全量抓取
-- **数据库备份**：Render PostgreSQL 自动备份
+- **数据库备份**：Supabase 自动备份
 
 ---
 
@@ -677,7 +677,8 @@ recency_boost（时间衰减）:
 | Lenny's Podcast | Substack | RSS | ❌ 否 | `https://www.lennysnewsletter.com/feed` |
 | 硅谷101 | Fireside | RSS | ❌ 否 | Fireside RSS 标准地址 |
 | Vercel | Vercel Inc. | 前端托管 + 自定义域名 | ✅ 是 | 自定义域名 `sr.miko-ai.cn` |
-| Render | Render Inc. | 后端托管 + PostgreSQL | ✅ 是 | API 服务 + 数据库一体化 |
+| Render | Render Inc. | 后端托管 | ✅ 是 | API 服务，免费版 15 分钟无流量休眠 |
+| Supabase PostgreSQL | Supabase Inc. | 数据库 | ✅ 是 | 免费版 500MB 存储，SSL 连接 |
 | UptimeRobot | UptimeRobot Inc. | 保活监控 | ✅ 是 | 每 5 分钟 ping /api/health |
 
 ---
