@@ -6,6 +6,7 @@
 |------|------|------|---------|--------|
 | v0.1 | 2026-05-27 | Claude | 初稿 | 待评审 |
 | v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | — |
+| v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源 | — |
 
 ---
 
@@ -41,6 +42,10 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 | P2 | 页面加载性能 | 首屏 < 3s，API < 200ms | ✅ v1.0 |
 | P2 | 自定义域名 | https://sr.miko-ai.cn/ | ✅ v1.0 |
 | P2 | 数据新鲜度保障 | ON CONFLICT 更新 published_at | ✅ v1.0 |
+| P0 | 英文内容翻译 | 百度翻译 API，非中文标题/摘要自动翻译展示 | ✅ v1.1 |
+| P0 | GitHub 历史热门 AI 仓库 | GitHub Search API 双通道搜索，种子数据 + 周增量 | ✅ v1.1 |
+| P0 | 爆料编辑/预览 | 发布后可编辑标题/摘要/标签/图片，预览卡片效果 | ✅ v1.1 |
+| P0 | 新增 RSS 数据源 | Product Hunt、Hacker News、OpenAI/Google/HuggingFace 博客 | ✅ v1.1 |
 
 ---
 
@@ -92,6 +97,19 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 - 进入「人物动态」Tab
 - 浏览最新播客内容，含标题、摘要和原文链接
 
+**场景七：浏览翻译后的英文内容**
+> 作为一个只看中文的从业者，我想看到英文标题和摘要直接翻译成中文，以便快速判断是否值得点进去看原文。
+
+- 首页卡片列表中的非中文内容标题/摘要自动展示为中文
+- 点击卡片跳转原文浏览英文原版内容
+
+**场景八：发现遗漏的 AI 神器**
+> 作为一个刚接触站点的用户，我想看到 GitHub 上最值得关注的 AI 工具，即使它们在我来之前就已经很火了。
+
+- 进入「工具榜」Tab，除了每日热门外，还有历史高星 AI 仓库
+- 按 Star 数排序，展示活跃的、公开的 AI 项目
+- 仓库附带热度评分和标签，融入现有内容体系
+
 ### 3.3 边缘场景
 
 - **单数据源抓取失败**：某个 RSS 源超时或返回错误，不影响其他卡片展示
@@ -99,6 +117,7 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 - **移动端横竖屏切换**：布局自适应不崩溃
 - **内容过期**：缓存超过 3 天的内容自动淘汰，不展示过时信息
 - **数据新鲜度**：连续多天上榜的 GitHub 仓库 `published_at` 更新为最新抓取时间，避免显示为过时数据
+- **翻译失败**：百度翻译 API 超时或限流时，自动跳过翻译，保留原文展示，下次抓取重试
 
 ---
 
@@ -108,16 +127,18 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 
 ```mermaid
 graph TB
-    subgraph 数据层["数据采集层"]
-        RSS[RSS 抓取器]
-        HTML[HTML 解析器<br/>GitHub Trending]
-        Admin[管理员录入]
-    end
-
     subgraph 处理层["数据处理层"]
         Tag[标签匹配引擎<br/>69关键词 · 正则匹配]
         Heat[热度评分引擎<br/>base × recency → 0-100°C]
         Topic[热门议题聚合<br/>48h · ≥2源类型 · ≥3篇]
+        TL[英译中引擎<br/>百度翻译 API<br/>非中文 CJK >30% 则翻译]
+    end
+
+    subgraph 数据层["数据采集层"]
+        RSS[RSS 抓取器]
+        HTML[HTML 解析器<br/>GitHub Trending]
+        GHS[GitHub Search API<br/>历史热门 AI 仓库]
+        Admin[管理员录入]
     end
 
     subgraph 存储层["数据存储层"]
@@ -162,8 +183,11 @@ graph LR
 
     subgraph External["External Sources"]
         GH[GitHub Trending<br/>HTML Scraper]
-        RSS[RSS Feeds<br/>arXiv/36氪/雷峰网]
+        GHS[GitHub Historical<br/>Search API]
+        RSS[RSS Feeds<br/>arXiv/36氪/雷峰网/HN/PH]
         POD[Podcast RSS<br/>Lenny's/硅谷101]
+        BLOG[Official Blogs<br/>OpenAI/Google/HuggingFace]
+        TRANS[百度翻译 API]
     end
 
     External --> Backend
@@ -207,11 +231,12 @@ flowchart TD
 
 ### 4.4 数据流说明
 
-1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共7个数据源，机器之心已禁用）
-2. **抓取链路**：RSS/HTML → 解析 → 热度评分 → 标签匹配 → 入库（URL 去重，重复时更新 published_at）
-3. **前端渲染**：React 请求 REST API → JSON 响应 → 骨架屏过渡 → 卡片渲染
-4. **用户交互**：筛选/排序/Tab切换 → URL参数变化 → API重新请求 → 内容刷新
-5. **管理员流程**：Token鉴权 → 提交爆料 → 写入DB → 刷新热门议题 → 前台可见
+1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共12个数据源，机器之心已禁用）
+2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 翻译检测 → 百度翻译（非中文）→ 入库（URL 去重，重复时更新 published_at）
+3. **历史仓库**：首次种子数据一次性拉取 50 条高星仓库，之后每周增量更新一次
+4. **前端渲染**：React 请求 REST API → JSON 响应（标题/摘要已翻译为中文）→ 骨架屏过渡 → 卡片渲染
+5. **用户交互**：筛选/排序/Tab切换 → URL参数变化 → API重新请求 → 内容刷新
+6. **管理员流程**：Token鉴权 → 提交/编辑爆料 → 写入DB → 刷新热门议题 → 前台可见
 
 ### 4.5 部署架构
 
@@ -269,6 +294,11 @@ flowchart TD
 | 后端缓存 | PostgreSQL 存储 + 缓存策略 | P0 | 避免频繁请求源站 |
 | **部署** | **自定义域名 sr.miko-ai.cn** | P2 | ✅ Vercel 自定义域名 |
 | **运维** | **UptimeRobot 保活监控** | P2 | ✅ 每5分钟 ping Render /api/health |
+| 内容翻译 | 非中文标题/摘要自动翻译展示 | P0 | ✅ v1.1 百度翻译 API |
+| 历史仓库 | GitHub Search API 拉取历史高星 AI 仓库 | P0 | ✅ v1.1 种子数据 + 周增量 |
+| 爆料编辑 | 发布后可编辑标题/摘要/标签/图片 | P0 | ✅ v1.1 新增 PATCH API |
+| 爆料预览 | 提交前预览卡片效果 | P0 | ✅ v1.1 管理表单改造 |
+| 新增数据源 | Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace | P0 | ✅ v1.1 5 个 RSS/Atom 源 |
 
 ---
 
@@ -375,8 +405,8 @@ flowchart TD
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | SERIAL PRIMARY KEY | 自增主键 |
-| name | TEXT | 数据源名称（GitHub Trending / arXiv / 36氪 / 雷峰网 / Lenny's Podcast / 硅谷101） |
-| slug | TEXT UNIQUE | 英文标识（github_trending / arxiv / 36kr / leiphone / lennys_podcast / sv101） |
+| name | TEXT | 数据源名称（GitHub Trending / arXiv / 36氪 / 雷峰网 / Lenny's Podcast / 硅谷101 / Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace） |
+| slug | TEXT UNIQUE | 英文标识（github_trending / arxiv / 36kr / leiphone / lennys_podcast / sv101 / product_hunt / hacker_news / openai_blog / google_ai_blog / huggingface_blog） |
 | feed_url | TEXT | RSS 地址 |
 | category | TEXT | 分类（opensource/paper/news/podcast） |
 | update_interval | TEXT | 更新频率（daily / hourly / weekly） |
@@ -391,6 +421,8 @@ flowchart TD
 | title | TEXT NOT NULL | 标题 |
 | url | TEXT NOT NULL UNIQUE | 原文链接（去重依据，带唯一索引） |
 | summary | TEXT | 摘要描述 |
+| **title_zh** | **TEXT** | **百度翻译后的中文标题（v1.1 新增）** |
+| **summary_zh** | **TEXT** | **百度翻译后的中文摘要（v1.1 新增）** |
 | author | TEXT | 作者 |
 | published_at | TIMESTAMP | 发布时间（**加索引**，用于排序查询。ON CONFLICT 时更新为最新） |
 | image_url | TEXT | 配图 URL（可选） |
@@ -439,10 +471,10 @@ flowchart TD
 定时触发（node-cron：8/12/18/22 UTC+8）
        │
        ▼
-  遍历启用的 sources（7个，机器之心禁用）
+  遍历启用的 sources（12个，机器之心禁用）
        │
        ▼
-  请求 RSS feed（fetch + fast-xml-parser / GitHub HTML Scraper）
+  请求 RSS feed / HTML Scraper / GitHub Search API
        │
        ├── 成功 → 解析 → 提取条目
        │         │
@@ -452,7 +484,12 @@ flowchart TD
        │         │
        │         ├── 热度评分：calculateHeatScore() 入库时一次性计算
        │         │
-       │         └── 标签匹配：tagArticle() 基于 tag_keywords 词库
+       │         ├── 标签匹配：tagArticle() 基于 tag_keywords 词库
+       │         │
+       │         └── v1.1 翻译检测：
+       │               ├── 标题/摘要含 CJK 汉字 > 30% → 跳过
+       │               ├── 标题/摘要为英文 → 调百度翻译 API
+       │               └── 结果写入 title_zh / summary_zh
        │
        └── 失败 → 尝试备用 RSS 地址（fallback_urls）
                   └── 全部失败 → 记录日志，不影响其他源
@@ -489,6 +526,7 @@ flowchart TD
 | GET | /api/sources | 获取数据源状态 | 无 | — |
 | GET | /api/health | 健康检查 / UptimeRobot 保活 | 无 | — |
 | POST | /api/admin/articles | 管理员录入爆料 | Bearer Token | title, url, summary, tags, category, image_url |
+| PATCH | /api/admin/articles/:id | 管理员编辑爆料（v1.1） | Bearer Token | title, url, summary, tags, category, image_url |
 | POST | /api/admin/fetch | 手动触发全量抓取 | Bearer Token | — |
 | POST | /api/admin/retag | 全量重新打标签 | Bearer Token | — |
 | POST | /api/admin/reheat | 全量重算热度评分 | Bearer Token | — |
@@ -507,6 +545,13 @@ flowchart TD
   "error": null
 }
 ```
+
+**管理员编辑接口 v1.1：**
+- `PATCH /api/admin/articles/:id`
+- 鉴权：Bearer Token
+- 请求体：`{ title?, url?, summary?, tags?, image_url?, category? }`（全部可选）
+- 响应：`{ data: { id }, error: null }`
+- 副作用：修改后自动调用 `generateHotTopics()` 刷新热门议题
 
 #### 5.2.4 热度评分算法
 
@@ -596,10 +641,106 @@ recency_boost（时间衰减）:
 
 **管理员功能一览：**
 - 录入爆料文章（手动填写标题/链接/摘要/分类/配图）
+- **编辑爆料文章（PATCH /api/admin/articles/:id，可修改标题/摘要/标签/图片）**
 - 手动触发全量抓取（`POST /api/admin/fetch`）
 - 全量重新打标签（`POST /api/admin/retag`，修改词库后触发）
 - 全量重算热度评分（`POST /api/admin/reheat`）
 - 查看数据统计概览（`GET /api/admin/stats`）
+
+### 5.5 英文内容翻译（P0, v1.1）
+
+**目标：** 非中文的标题和摘要自动翻译为中文展示，降低英文阅读门槛，用户感兴趣时跳转原文。
+
+**翻译判断规则（避免浪费 API 额度）：**
+
+```
+统计文本中 CJK 汉字字符占比：
+  > 30% → 视为中文内容，跳过翻译
+  ≤ 30% → 视为非中文内容，调用百度翻译
+```
+
+**特殊处理：**
+- GitHub 标题 `owner/repo` 格式（无中文、无英文句子）→ 跳过翻译
+- 摘要为空 → 跳过翻译
+- 翻译失败（超时/限流）→ 保留原文，下次抓取时重试
+- 后续 ON CONFLICT 更新时，已有翻译结果的不重复调用
+
+**数据流：**
+
+```
+抓取 → 入库 → 扫描非中文文章 → 调百度翻译 API（title + summary）
+       → 结果写入 title_zh / summary_zh
+       → API 返回时优先返回翻译版
+       → 前端直接展示，无改动
+```
+
+**API 选择：** 百度翻译 API（标准版，免费 100 万字符/月，国内访问快）
+- 你需要做的事：在 [百度翻译开放平台](https://api.fanyi.baidu.com/) 注册，领取 `appid` + `key`，配置为环境变量 `BAIDU_TRANSLATE_APPID` 和 `BAIDU_TRANSLATE_KEY`
+
+### 5.6 GitHub 历史热门 AI 仓库（P0, v1.1）
+
+**背景：** 网站上线时间短，GitHub Trending 只抓当天热榜，很多高 star 的 AI 工具（如 ollama、AutoGPT、LangChain 等）没有被收录。
+
+**目标：** 通过 GitHub Search API 拉取近一年活跃的高星 AI 仓库，补全"工具榜"Tab 的内容厚度。
+
+**搜索策略（双通道）：**
+
+```
+通道 A（Topic 标签搜索）：
+  q: topic:ai OR topic:llm OR topic:agent OR topic:machine-learning OR
+      topic:deep-learning OR topic:rag OR topic:stable-diffusion OR
+      topic:computer-vision OR topic:nlp OR topic:large-language-model
+  sort: stars desc
+  pushed: >2025-06-01
+
+通道 B（描述关键词兜底，覆盖未打标签的仓库）：
+  q: "ai" OR "artificial intelligence" OR "llm" in:description
+  stars: >5000
+  pushed: >2025-06-01
+
+合并去重：以 URL 去重（与 articles.url 唯一索引一致）
+```
+
+**更新频率：**
+- 首次：种子数据拉 50 条
+- 后续：每周增量更新一次，仅入库新仓库
+
+**与现有体系的融合：**
+- 共用 `articles` 表，source_id 指向 `github_trending`，slug 加后缀区分
+- 共用标签匹配引擎和热度评分体系
+- 共用热度评分（基于 star 数 + 时间衰减），展示在"工具榜"Tab
+
+### 5.7 管理员爆料编辑/预览（P0, v1.1）
+
+**编辑功能：**
+- 后端新增 `PATCH /api/admin/articles/:id`
+- 可修改字段：标题、原文链接、摘要、分类、配图、标签
+- 修改后触发 `generateHotTopics()` 刷新热门议题
+- 历史发布的爆料均可编辑，不限修改时间
+
+**预览功能：**
+- 管理页面表单下方实时渲染卡片预览
+- 所有字段变动即时反映在预览卡片上
+- 预览卡片样式与前端 ArticleCard 一致
+
+**表单验证（前置，v1.0 爆料在提交后才验证，v1.1 提前到输入时）：**
+- 标题：不能为空
+- 原文链接：不能为空，校验 http/https 格式
+- 摘要：不能为空
+- 配图：可选，有则校验 URL 格式
+- 错误提示在对应字段下方实时显示
+
+### 5.8 新增 RSS 数据源（P0, v1.1）
+
+| 数据源 | 分类 | 接入方式 | 更新频率 | 说明 |
+|--------|------|---------|---------|------|
+| Product Hunt | opensource/tools | RSS 2.0 | 每日 | 每日新 AI 工具首发，与工具榜 Tab 完美匹配 |
+| Hacker News | news | Atom feed | 实时 | 硅谷第一技术社区，AI 讨论浓度高 |
+| OpenAI Blog | news | RSS | 不定期 | 第一手动向（GPT 发布、政策更新等）|
+| Google AI Blog | news | Atom | 不定期 | Google AI 官方动态 |
+| Hugging Face Blog | news | RSS | 不定期 | 开源 AI 社区核心生态 |
+
+**接入方式：** 现有 fedcher.ts 已支持标准 RSS 2.0 和 Atom，只需在 `seed.sql` 中追加数据源记录即可，无需代码变更。
 
 ---
 
@@ -614,6 +755,8 @@ recency_boost（时间衰减）:
 | 单卡片加载失败 | 前端 catch 错误，不阻塞列表 |
 | GitHub Trending HTML 结构变更 | 解析返回 0 条，记录日志，下次重试 |
 | **数据新鲜度**：连续多天上榜的仓库 `published_at` 过时 | ON CONFLICT 时更新 `published_at` |
+| **翻译失败**：百度翻译 API 超时/限流 | 跳过翻译保留原文，下次抓取重试 |
+| **GitHub Search API 限流**：每小时 5000 次 | 失败后静默跳过，下个周期重试 |
 
 ### 6.2 API 异常
 | 场景 | HTTP 状态码 | 响应体 |
@@ -680,6 +823,13 @@ recency_boost（时间衰减）:
 | Render | Render Inc. | 后端托管 | ✅ 是 | API 服务，免费版 15 分钟无流量休眠 |
 | Supabase PostgreSQL | Supabase Inc. | 数据库 | ✅ 是 | 免费版 500MB 存储，SSL 连接 |
 | UptimeRobot | UptimeRobot Inc. | 保活监控 | ✅ 是 | 每 5 分钟 ping /api/health |
+| 百度翻译 API | 百度 | 英译中 | ✅ 是（v1.1） | 标准版免费 100 万字符/月 |
+| Product Hunt | Product Hunt | RSS 数据源 | ✅ 是（v1.1） | `https://www.producthunt.com/feed` |
+| Hacker News | Y Combinator | RSS 数据源 | ✅ 是（v1.1） | `https://news.ycombinator.com/rss` |
+| OpenAI Blog | OpenAI | RSS 数据源 | ❌ 否（v1.1） | `https://openai.com/blog/rss/`，更新不定期 |
+| Google AI Blog | Google | RSS 数据源 | ❌ 否（v1.1） | `http://googleaiblog.blogspot.com/atom.xml`，更新不定期 |
+| Hugging Face Blog | Hugging Face | RSS 数据源 | ❌ 否（v1.1） | `https://huggingface.co/blog/feed.xml`，更新不定期 |
+| GitHub Search API | GitHub | 搜索接口 | ✅ 是（v1.1） | 免费 5000 次/小时，种子数据 + 周增量 |
 
 ---
 
@@ -745,6 +895,18 @@ recency_boost（时间衰减）:
 - [x] UptimeRobot 保活生效，服务持续运行
 - [x] GitHub Trending `published_at` 随抓取更新
 
+### 10.5 V1.1 验收
+- [ ] 非中文标题/摘要自动翻译为中文，卡片展示翻译后文本
+- [ ] 中文内容（含少量英文术语）不触发翻译
+- [ ] 百度翻译 API 失败时保留原文，不阻塞抓取
+- [ ] GitHub 历史热门 AI 仓库首批种子数据 ≥30 条入库
+- [ ] 历史仓库按周增量更新，不重复入库
+- [ ] 管理员可编辑已发布的爆料（标题/摘要/标签/图片）
+- [ ] 编辑表单提交前实时预览卡片效果
+- [ ] 爆料表单字段实时校验（标题/URL/摘要非空）
+- [ ] Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace 新源正常抓取展示
+- [ ] 新源内容带有正确来源标签和热度评分
+
 ---
 
 ## 附录
@@ -763,18 +925,31 @@ recency_boost（时间衰减）:
   - 标签/元数据：`'JetBrains Mono', 'Fira Code', monospace`
 - **圆角**：卡片 1.5rem（3xl），按钮 0.5rem（lg）到 9999px（胶囊）
 
-### B. V1.0 变更记录
+### B. 版本变更记录
+
+#### V1.0（2026-06-01）
 
 | 变更 | 类型 | 说明 |
 |------|------|------|
 | 自定义域名 | 部署 | https://sr.miko-ai.cn/，Vercel 自定义域名配置 |
 | 保活监控 | 运维 | UptimeRobot 每 5 分钟 ping Render /api/health |
 | 数据新鲜度修复 | Bugfix | ON CONFLICT 时更新 published_at，解决 GitHub Trending 时间戳停滞 |
-| 分离部署 | 架构 | Vercel（前端）+ Render（后端+数据库）分离部署 |
+| 分离部署 | 架构 | Vercel（前端）+ Render（后端）分离部署 |
 | 亮色模式 | 功能 | CSS 变量 + localStorage 持久化，支持暗色/亮色切换 |
 | 36氪 AI 过滤 | 优化 | 仅保留 AI 相关文章，过滤财经/股市噪音 |
 | 手动抓取 | 管理 | 新增 POST /api/admin/fetch 接口 |
 | 全量重算热度 | 管理 | 新增 POST /api/admin/reheat 接口 |
+
+#### V1.1（2026-06-02）
+
+| 变更 | 类型 | 说明 |
+|------|------|------|
+| 英文内容翻译 | 功能 | 接入百度翻译 API，非中文标题/摘要自动翻译展示，CJK >30% 跳过 |
+| GitHub 历史热门 AI 仓库 | 功能 | GitHub Search API 双通道搜索，种子 50 条 + 每周增量更新 |
+| 爆料编辑 | 管理 | 新增 PATCH /api/admin/articles/:id，支持修改标题/摘要/标签/图片 |
+| 爆料预览 | 管理 | 管理表单实时渲染卡片预览，所见即所得 |
+| 爆料表单验证 | 管理 | 前端实时校验必填字段和 URL 格式 |
+| 新增数据源 | 数据 | Product Hunt、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog |
 
 ### C. 竞品参考列表
 | 产品 | 网址 | 参考价值 |
