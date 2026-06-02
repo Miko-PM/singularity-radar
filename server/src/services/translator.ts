@@ -339,7 +339,7 @@ export async function runTranslationQueue(): Promise<void> {
         summary: string;
       }>(
         `SELECT id, title, summary FROM articles
-         WHERE title_zh = '' AND summary_zh = ''
+         WHERE title_zh IS NULL OR summary_zh IS NULL
          ORDER BY hot_score DESC, id ASC
          LIMIT $1 OFFSET $2`,
         [BATCH_SIZE, offset]

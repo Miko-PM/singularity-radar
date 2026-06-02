@@ -39,9 +39,15 @@ CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DE
 CREATE INDEX IF NOT EXISTS idx_articles_source_id ON articles(source_id);
 CREATE INDEX IF NOT EXISTS idx_articles_hot_score ON articles(hot_score DESC);
 
--- V1.1: 英文翻译字段
-ALTER TABLE articles ADD COLUMN IF NOT EXISTS title_zh TEXT NOT NULL DEFAULT '';
-ALTER TABLE articles ADD COLUMN IF NOT EXISTS summary_zh TEXT NOT NULL DEFAULT '';
+-- V1.1: 英文翻译字段（NULL = 未处理，'' = 已处理/无需翻译）
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS title_zh TEXT;
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS summary_zh TEXT;
+ALTER TABLE articles ALTER COLUMN title_zh DROP NOT NULL;
+ALTER TABLE articles ALTER COLUMN summary_zh DROP NOT NULL;
+ALTER TABLE articles ALTER COLUMN title_zh SET DEFAULT NULL;
+ALTER TABLE articles ALTER COLUMN summary_zh SET DEFAULT NULL;
+UPDATE articles SET title_zh = NULL WHERE title_zh = '';
+UPDATE articles SET summary_zh = NULL WHERE summary_zh = '';
 
 -- V1.1: GitHub 仓库星数字段（常青榜/新锐榜/趋势榜）
 ALTER TABLE articles ADD COLUMN IF NOT EXISTS stars INTEGER DEFAULT 0;
