@@ -19,7 +19,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
 
 // 中间件
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3001').split(',');
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3001,https://sr.miko-ai.cn').split(',');
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
