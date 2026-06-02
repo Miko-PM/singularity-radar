@@ -2,11 +2,26 @@
 
 ## 1. 修订历史
 
-| 版本 | 日期 | 作者 | 变更内容 | 评审人 |
-|------|------|------|---------|--------|
-| v0.1 | 2026-05-27 | Claude | 初稿 | 待评审 |
-| v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | — |
-| v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源 | — |
+| 版本 | 日期 | 作者 | 变更内容 | 状态 | 评审人 | 评审完成时间 |
+|------|------|------|---------|------|------|------------|
+| v0.1 | 2026-05-27 | Claude | 初稿 | 已归档 | miko | 2026-05-29 |
+| v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | 已发布 | miko | 2026-06-01 |
+| v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源、热度评分平衡调整、置顶衰减 | **已发布** | miko | 2026-06-02 |
+
+---
+
+> ### V1.1 新增功能速览
+> 以下为 V1.1 版本的全部新增功能，文档中以 `(v1.1)` 标记区分：
+>
+> | # | 功能 | 优先级 | 所在章节 |
+> |---|------|--------|---------|
+> | 1 | **英文内容自动翻译**：百度翻译 API，异步队列批量处理。CJK > 15% 视为中文跳过，≤ 15% 自动翻译 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
+> | 2 | **GitHub 历史热门 AI 仓库**：常青榜（Top 20-30 经典项目）+ 新锐榜（近 30 天增量最快项目），分区展示 | P0 | [§5.6](#56-github-历史热门-ai-仓库p0-v11) |
+> | 3 | **爆料编辑/预览/验证**：PATCH API + 实时卡片预览 + 前端表单校验 | P0 | [§5.7](#57-管理员爆料编辑预览p0-v11) |
+> | 4 | **新增 RSS 数据源**：Product Hunt（AI 关键词过滤）、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog | P0 | [§5.8](#58-新增-rss-数据源p0-v11) |
+> | 5 | **管理员置顶机制**：置顶/取消置顶 + 热度衰减（99→95→90→85→普通），"置顶"红色角标 | P0 | [§5.4](#54-管理员爆料p1) |
+> | 6 | **热度评分平衡**：GitHub 星数降 5 分、加分收窄 5→3、长青榜封顶 70°C | P0 | [§5.2.4](#524-热度评分算法) |
+> | 7 | **翻译/历史仓库/新源对应的验收标准** | — | [§10.5](#105-v11-验收) |
 
 ---
 
@@ -43,7 +58,7 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 | P2 | 自定义域名 | https://sr.miko-ai.cn/ | ✅ v1.0 |
 | P2 | 数据新鲜度保障 | ON CONFLICT 更新 published_at | ✅ v1.0 |
 | P0 | 英文内容翻译 | 百度翻译 API，非中文标题/摘要自动翻译展示 | ✅ v1.1 |
-| P0 | GitHub 历史热门 AI 仓库 | GitHub Search API 双通道搜索，种子数据 + 周增量 | ✅ v1.1 |
+| P0 | GitHub 历史热门 AI 仓库 | GitHub Search API 双通道搜索，常青榜 + 新锐榜分区展示 | ✅ v1.1 |
 | P0 | 爆料编辑/预览 | 发布后可编辑标题/摘要/标签/图片，预览卡片效果 | ✅ v1.1 |
 | P0 | 新增 RSS 数据源 | Product Hunt、Hacker News、OpenAI/Google/HuggingFace 博客 | ✅ v1.1 |
 
@@ -97,13 +112,13 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 - 进入「人物动态」Tab
 - 浏览最新播客内容，含标题、摘要和原文链接
 
-**场景七：浏览翻译后的英文内容**
+**场景七：浏览翻译后的英文内容** `(v1.1)`
 > 作为一个只看中文的从业者，我想看到英文标题和摘要直接翻译成中文，以便快速判断是否值得点进去看原文。
 
 - 首页卡片列表中的非中文内容标题/摘要自动展示为中文
 - 点击卡片跳转原文浏览英文原版内容
 
-**场景八：发现遗漏的 AI 神器**
+**场景八：发现遗漏的 AI 神器** `(v1.1)`
 > 作为一个刚接触站点的用户，我想看到 GitHub 上最值得关注的 AI 工具，即使它们在我来之前就已经很火了。
 
 - 进入「工具榜」Tab，除了每日热门外，还有历史高星 AI 仓库
@@ -231,12 +246,12 @@ flowchart TD
 
 ### 4.4 数据流说明
 
-1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共12个数据源，机器之心已禁用）
-2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 翻译检测 → 百度翻译（非中文）→ 入库（URL 去重，重复时更新 published_at）
-3. **历史仓库**：首次种子数据一次性拉取 50 条高星仓库，之后每周增量更新一次
-4. **前端渲染**：React 请求 REST API → JSON 响应（标题/摘要已翻译为中文）→ 骨架屏过渡 → 卡片渲染
+1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共17个数据源，机器之心已禁用）
+2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 入库（不等翻译，URL 去重，重复时更新 published_at）→ 异步翻译队列（v1.1）扫描未翻译文章 → 百度翻译 → 写入 title_zh/summary_zh
+3. **历史仓库**（v1.1）：首次种子数据一次性拉取 50 条高星仓库（常青榜），之后每周增量更新一次；新锐榜随每次抓取同步更新
+4. **前端渲染**：React 请求 REST API → JSON 响应（title_zh 非空时优先返回翻译版）→ 骨架屏过渡 → 卡片渲染
 5. **用户交互**：筛选/排序/Tab切换 → URL参数变化 → API重新请求 → 内容刷新
-6. **管理员流程**：Token鉴权 → 提交/编辑爆料 → 写入DB → 刷新热门议题 → 前台可见
+6. **管理员流程**（编辑 v1.1）：Token鉴权 → 提交/编辑爆料 → 写入DB → 刷新热门议题 → 前台可见
 
 ### 4.5 部署架构
 
@@ -295,7 +310,7 @@ flowchart TD
 | **部署** | **自定义域名 sr.miko-ai.cn** | P2 | ✅ Vercel 自定义域名 |
 | **运维** | **UptimeRobot 保活监控** | P2 | ✅ 每5分钟 ping Render /api/health |
 | 内容翻译 | 非中文标题/摘要自动翻译展示 | P0 | ✅ v1.1 百度翻译 API |
-| 历史仓库 | GitHub Search API 拉取历史高星 AI 仓库 | P0 | ✅ v1.1 种子数据 + 周增量 |
+| 历史仓库 | GitHub Search API 拉取历史高星 AI 仓库 | P0 | ✅ v1.1 常青榜 + 新锐榜分区展示 |
 | 爆料编辑 | 发布后可编辑标题/摘要/标签/图片 | P0 | ✅ v1.1 新增 PATCH API |
 | 爆料预览 | 提交前预览卡片效果 | P0 | ✅ v1.1 管理表单改造 |
 | 新增数据源 | Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace | P0 | ✅ v1.1 5 个 RSS/Atom 源 |
@@ -421,8 +436,8 @@ flowchart TD
 | title | TEXT NOT NULL | 标题 |
 | url | TEXT NOT NULL UNIQUE | 原文链接（去重依据，带唯一索引） |
 | summary | TEXT | 摘要描述 |
-| **title_zh** | **TEXT** | **百度翻译后的中文标题（v1.1 新增）** |
-| **summary_zh** | **TEXT** | **百度翻译后的中文摘要（v1.1 新增）** |
+| **title_zh** | **TEXT NOT NULL DEFAULT ''** | **百度翻译后的中文标题（v1.1 新增）。未翻译时为空字符串，前端判断 `title_zh !== ''` 时展示翻译版。不加索引（非查询条件）** |
+| **summary_zh** | **TEXT NOT NULL DEFAULT ''** | **百度翻译后的中文摘要（v1.1 新增）。未翻译时为空字符串，前端逻辑同 title_zh** |
 | author | TEXT | 作者 |
 | published_at | TIMESTAMP | 发布时间（**加索引**，用于排序查询。ON CONFLICT 时更新为最新） |
 | image_url | TEXT | 配图 URL（可选） |
@@ -471,12 +486,16 @@ flowchart TD
 定时触发（node-cron：8/12/18/22 UTC+8）
        │
        ▼
-  遍历启用的 sources（12个，机器之心禁用）
+  遍历启用的 sources（17个，机器之心禁用）
+       │
+       ├── Product Hunt → AI 关键词白名单过滤（v1.1）
        │
        ▼
   请求 RSS feed / HTML Scraper / GitHub Search API
        │
        ├── 成功 → 解析 → 提取条目
+       │         │
+       │         ├── 36氪 → AI 关键词过滤（已有）
        │         │
        │         ├── URL 去重：INSERT ... ON CONFLICT (url) DO UPDATE
        │         │   ├── 新增 → 写入完整记录
@@ -486,13 +505,21 @@ flowchart TD
        │         │
        │         ├── 标签匹配：tagArticle() 基于 tag_keywords 词库
        │         │
-       │         └── v1.1 翻译检测：
-       │               ├── 标题/摘要含 CJK 汉字 > 30% → 跳过
-       │               ├── 标题/摘要为英文 → 调百度翻译 API
-       │               └── 结果写入 title_zh / summary_zh
+       │         └── 入库完成（不等翻译，主流程继续）
        │
        └── 失败 → 尝试备用 RSS 地址（fallback_urls）
                   └── 全部失败 → 记录日志，不影响其他源
+
+  ── 抓取主流程结束 ──
+
+       ▼
+  异步翻译队列（v1.1，独立于主流程）：
+       ├── 扫描 title_zh = '' 的文章
+       ├── CJK 汉字 > 15% → 跳过（中文内容）
+       ├── CJK 汉字 ≤ 15% → 翻译
+       │     ├── 多条标题+摘要打包（百度 API 单次最多 6000 字符）
+       │     └── 结果写入 title_zh / summary_zh
+       └── 翻译失败/超时 → 保留空，下次队列重试
 ```
 
 **数据清洗：**
@@ -549,39 +576,76 @@ flowchart TD
 **管理员编辑接口 v1.1：**
 - `PATCH /api/admin/articles/:id`
 - 鉴权：Bearer Token
-- 请求体：`{ title?, url?, summary?, tags?, image_url?, category? }`（全部可选）
+- 请求体：JSON（字段全部可选）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| title | string | 否 | 修改标题 |
+| url | string | 否 | 修改原文链接。**注意：** URL 是唯一索引，若新 URL 已存在则返回 409 冲突 |
+| summary | string | 否 | 修改摘要 |
+| tags | string | 否 | **全量覆盖**：传入的 tags 替换原有标签（非增量追加）。格式：逗号分隔，如 `"AI,Agent,大模型"` |
+| image_url | string | 否 | 修改配图 URL |
+| category | string | 否 | 修改分类（opensource/paper/news/podcast）|
+
 - 响应：`{ data: { id }, error: null }`
+- 错误：`{ error: "not found" }`（404）| `{ error: "url conflict" }`（409）| `{ error: "forbidden" }`（403）
 - 副作用：修改后自动调用 `generateHotTopics()` 刷新热门议题
 
 #### 5.2.4 热度评分算法
 
-卡片上展示的"热度 90°C"为视觉元素，后端定义伪热度公式：
+卡片上展示的"热度 90°C"为视觉元素，后端定义热度公式：
 
 ```
-hot_score = base_score × recency_boost
+hot_score = min(round(base × recency_boost + bonus), 100) °C
+
+管理员置顶文章时效内固定 99°C，随 72h 逐渐衰减至正常评分
 
 base_score（数据源基础权重）:
-  - GitHub Trending: 65（基础分）+ star_count / 10000（增量）
-  - arXiv 论文: 55
-  - 36氪: 60（中文 AI 媒体权重）
-  - 雷峰网: 50
-  - Lenny's Podcast: 70（独特性加成）
-  - 硅谷101: 60
-  - 管理员爆料: 75（人工录入默认较高）
+  - GitHub Trending / 历史仓库（opensource）: 分档制
+    - ★ < 100: 20
+    - ★ < 500: 30
+    - ★ < 2000: 40
+    - ★ < 10000: 45
+    - ★ < 50000: 50
+    - ★ < 100000: 55
+    - ★ ≥ 100000: 60
+  - arXiv 论文（paper）: 40
+  - 36氪（slug: 36kr）: 50
+  - 雷峰网（news）: 55
+  - Lenny's Podcast（podcast）: 60
+  - 硅谷101（slug: sv101）: 50
+  - 管理员爆料（admin）: 75（非置顶）
+  - Product Hunt（v1.1）: 55
+  - Hacker News（v1.1）: 50
+  - OpenAI / Google AI / HuggingFace Blog（v1.1）: 65
+  - 默认: 40
 
 recency_boost（时间衰减）:
   - 12 小时内: 1.5
   - 24 小时内: 1.3
   - 48 小时内: 1.1
   - 超过 48 小时: 1.0
-```
 
-**前端展示：** hot_score 线性等比映射到 0~100°C，当前批次最高分 = 100°C，其他按比例折算。
+bonus（额外加分）:
+  - 有配图: +3
+  - ≥3 个标签: +3
+
+管理员置顶衰减:
+  - 0-12 小时: 99°C（固定）
+  - 12-24 小时: 95°C
+  - 24-48 小时: 90°C
+  - 48-72 小时: 85°C
+  - 超过 72 小时: 降为普通管理员 base（75°C），不再享有置顶加分
+
+长青榜封顶:
+  - GitHub 常青榜（slug: github_evergreen）: 封顶 70°C，长期推荐不霸榜
+```
 
 **排序策略：**
 - `hot_score` 在入库时一次性计算并写入数据库，之后不再修改
-- 按"高热爆料"筛选时，限定查询 `最近 3 天` 的数据，按 `hot_score DESC` 排序
+- 按"高热爆料"筛选时，按 `hot_score DESC, is_pinned DESC, pinned_at DESC NULLS LAST, published_at DESC` 排序
 - 按"最新情报"筛选时，按 `published_at DESC` 排序
+- 置顶排序仅在 hot_score 相同时作为 tiebreaker 生效（衰减后自然降序）
 
 ### 5.3 热门议题聚合（P1）
 
@@ -655,9 +719,11 @@ recency_boost（时间衰减）:
 
 ```
 统计文本中 CJK 汉字字符占比：
-  > 30% → 视为中文内容，跳过翻译
-  ≤ 30% → 视为非中文内容，调用百度翻译
+  > 15% → 视为中文内容（含英文术语的中文文本），跳过翻译
+  ≤ 15% → 视为非中文内容，调用百度翻译
 ```
+
+> **阈值说明：** GitHub 仓库描述如"这是一个基于 Transformer 的框架，支持 LLaMA/Qwen/DeepSeek 等模型"中 CJK 占比约 20%，阈值设为 15% 可覆盖此类中英混写文本。上线后可基于实际数据微调。
 
 **特殊处理：**
 - GitHub 标题 `owner/repo` 格式（无中文、无英文句子）→ 跳过翻译
@@ -665,14 +731,25 @@ recency_boost（时间衰减）:
 - 翻译失败（超时/限流）→ 保留原文，下次抓取时重试
 - 后续 ON CONFLICT 更新时，已有翻译结果的不重复调用
 
-**数据流：**
+**异步翻译队列（不阻塞主抓取流程）：**
 
 ```
-抓取 → 入库 → 扫描非中文文章 → 调百度翻译 API（title + summary）
-       → 结果写入 title_zh / summary_zh
-       → API 返回时优先返回翻译版
-       → 前端直接展示，无改动
+抓取 → 入库（title/summary 原文）→ 返回（不等翻译）
+                                            ↓
+              异步 translator 扫描 title_zh IS NULL 的文章
+                                            ↓
+              批量调百度翻译 API（单次最多 6000 字符，
+              多条标题/摘要打包一次请求）
+                                            ↓
+              更新 title_zh / summary_zh
+                                            ↓
+              API 返回时优先返回翻译版 → 前端直接展示
 ```
+
+**设计理由：**
+- 避免串行等待百度 API 返回（每条 1-2s），防止抓取流程整体变慢
+- 百度翻译 API 支持批量翻译，单次最多 6000 字符，可将多条文章打包一次请求
+- 翻译失败不影响抓取结果，下次队列重试即可
 
 **API 选择：** 百度翻译 API（标准版，免费 100 万字符/月，国内访问快）
 - 你需要做的事：在 [百度翻译开放平台](https://api.fanyi.baidu.com/) 注册，领取 `appid` + `key`，配置为环境变量 `BAIDU_TRANSLATE_APPID` 和 `BAIDU_TRANSLATE_KEY`
@@ -681,9 +758,16 @@ recency_boost（时间衰减）:
 
 **背景：** 网站上线时间短，GitHub Trending 只抓当天热榜，很多高 star 的 AI 工具（如 ollama、AutoGPT、LangChain 等）没有被收录。
 
-**目标：** 通过 GitHub Search API 拉取近一年活跃的高星 AI 仓库，补全"工具榜"Tab 的内容厚度。
+**目标：** 通过 GitHub Search API 拉取高星 AI 仓库，补全"工具榜"Tab 的内容厚度。
 
-**搜索策略（双通道）：**
+**设计思路：** 将 GitHub 仓库分为两类展示，兼顾"不可错过"和"新鲜感"：
+
+| 类型 | 定位 | 内容构成 | 更新频率 | 展示位置 |
+|------|------|---------|---------|---------|
+| **常青榜** | 经典 AI 工具，如维基百科 | Top 20-30 历史高星仓库（按 stars desc） | 每周增量更新，排名基本稳定 | 工具榜 Tab 顶部专区 |
+| **新锐榜** | 近期增长最快的 AI 项目 | 近 30 天 star 增量最快的仓库 | 每次抓取更新 | 工具榜 Tab 常青榜下方 |
+
+**常青榜搜索策略（双通道）：**
 
 ```
 通道 A（Topic 标签搜索）：
@@ -699,16 +783,30 @@ recency_boost（时间衰减）:
   pushed: >2025-06-01
 
 合并去重：以 URL 去重（与 articles.url 唯一索引一致）
+屏蔽已入库的 Trending 当日数据
+```
+
+**新锐榜搜索策略：**
+
+```
+q: topic:ai OR topic:llm OR topic:agent OR topic:machine-learning OR
+   topic:deep-learning (与常青榜同主题)
+sort: stars desc
+pushed: >2026-05-01（30 天时间窗口）
+
+取返回结果中 star 数增量最高的前 20 条
+（首次无基线时按 stars desc 排序）
 ```
 
 **更新频率：**
-- 首次：种子数据拉 50 条
-- 后续：每周增量更新一次，仅入库新仓库
+- **常青榜**：首次种子数据拉 50 条，之后每周增量更新一次（仅入库新仓库，已有仓库按需更新 star 数）
+- **新锐榜**：每次常规抓取时同步更新（与 GitHub Trending 同频）
 
 **与现有体系的融合：**
-- 共用 `articles` 表，source_id 指向 `github_trending`，slug 加后缀区分
+- 共用 `articles` 表，source_id 指向 `github_trending`，slug 加后缀区分（`github_evergreen` / `github_rising`）
 - 共用标签匹配引擎和热度评分体系
-- 共用热度评分（基于 star 数 + 时间衰减），展示在"工具榜"Tab
+- 热度评分基于 star 数 + 时间衰减，展示在"工具榜"Tab 分区展示
+- **API 限流**：需配置 `GITHUB_TOKEN` 环境变量（认证后 5000 次/小时），否则未认证仅 60 次/小时极易在 cron 执行时耗尽
 
 ### 5.7 管理员爆料编辑/预览（P0, v1.1）
 
@@ -734,13 +832,24 @@ recency_boost（时间衰减）:
 
 | 数据源 | 分类 | 接入方式 | 更新频率 | 说明 |
 |--------|------|---------|---------|------|
-| Product Hunt | opensource/tools | RSS 2.0 | 每日 | 每日新 AI 工具首发，与工具榜 Tab 完美匹配 |
+| Product Hunt | opensource/tools | RSS 2.0 | 每日 | 每日新 AI 工具首发，与工具榜 Tab 匹配（需 AI 过滤）|
 | Hacker News | news | Atom feed | 实时 | 硅谷第一技术社区，AI 讨论浓度高 |
 | OpenAI Blog | news | RSS | 不定期 | 第一手动向（GPT 发布、政策更新等）|
 | Google AI Blog | news | Atom | 不定期 | Google AI 官方动态 |
 | Hugging Face Blog | news | RSS | 不定期 | 开源 AI 社区核心生态 |
 
-**接入方式：** 现有 fedcher.ts 已支持标准 RSS 2.0 和 Atom，只需在 `seed.sql` 中追加数据源记录即可，无需代码变更。
+**Product Hunt AI 内容过滤：**
+Product Hunt RSS feed 包含所有品类新品（游戏、设计工具、营销 SaaS 等），需仿照 36氪过滤逻辑，在 `fetcher.ts` 中针对 `product_hunt` slug 增加 AI 关键词白名单：
+
+```
+白名单关键词：AI / artificial intelligence / machine learning / LLM / GPT /
+chatbot / copilot / automation / deep learning / neural / computer vision /
+NLP / recommendation / predictive / analytics / data science
+```
+
+非匹配内容跳过，仅保留 AI 相关工具。
+
+**接入方式：** 现有 `fetcher.ts` 已支持标准 RSS 2.0 和 Atom，在 `seed.sql` 中追加数据源记录，同时为 Product Hunt 添加过滤逻辑即可。
 
 ---
 
@@ -755,8 +864,8 @@ recency_boost（时间衰减）:
 | 单卡片加载失败 | 前端 catch 错误，不阻塞列表 |
 | GitHub Trending HTML 结构变更 | 解析返回 0 条，记录日志，下次重试 |
 | **数据新鲜度**：连续多天上榜的仓库 `published_at` 过时 | ON CONFLICT 时更新 `published_at` |
-| **翻译失败**：百度翻译 API 超时/限流 | 跳过翻译保留原文，下次抓取重试 |
-| **GitHub Search API 限流**：每小时 5000 次 | 失败后静默跳过，下个周期重试 |
+| **翻译失败**（v1.1）：百度翻译 API 超时/限流 | 跳过翻译保留原文，下次抓取重试 |
+| **GitHub Search API 限流**（v1.1）：每小时 5000 次 | 失败后静默跳过，下个周期重试 |
 
 ### 6.2 API 异常
 | 场景 | HTTP 状态码 | 响应体 |
@@ -829,7 +938,7 @@ recency_boost（时间衰减）:
 | OpenAI Blog | OpenAI | RSS 数据源 | ❌ 否（v1.1） | `https://openai.com/blog/rss/`，更新不定期 |
 | Google AI Blog | Google | RSS 数据源 | ❌ 否（v1.1） | `http://googleaiblog.blogspot.com/atom.xml`，更新不定期 |
 | Hugging Face Blog | Hugging Face | RSS 数据源 | ❌ 否（v1.1） | `https://huggingface.co/blog/feed.xml`，更新不定期 |
-| GitHub Search API | GitHub | 搜索接口 | ✅ 是（v1.1） | 免费 5000 次/小时，种子数据 + 周增量 |
+| GitHub Search API | GitHub | 搜索接口 | ✅ 是（v1.1） | 认证后 5000 次/小时。需配置 `GITHUB_TOKEN` 环境变量传认证请求头，否则未认证仅 60 次/小时。常青榜种子 + 每周增量 + 新锐榜随抓取更新 |
 
 ---
 
@@ -896,16 +1005,56 @@ recency_boost（时间衰减）:
 - [x] GitHub Trending `published_at` 随抓取更新
 
 ### 10.5 V1.1 验收
-- [ ] 非中文标题/摘要自动翻译为中文，卡片展示翻译后文本
-- [ ] 中文内容（含少量英文术语）不触发翻译
-- [ ] 百度翻译 API 失败时保留原文，不阻塞抓取
-- [ ] GitHub 历史热门 AI 仓库首批种子数据 ≥30 条入库
-- [ ] 历史仓库按周增量更新，不重复入库
-- [ ] 管理员可编辑已发布的爆料（标题/摘要/标签/图片）
-- [ ] 编辑表单提交前实时预览卡片效果
-- [ ] 爆料表单字段实时校验（标题/URL/摘要非空）
-- [ ] Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace 新源正常抓取展示
-- [ ] 新源内容带有正确来源标签和热度评分
+
+**翻译**
+- [x] 非中文标题/摘要自动翻译为中文，卡片展示翻译后文本
+- [x] CJK 汉字 > 15% 的中英混写文本（如"基于 Transformer 的框架，支持 LLaMA/Qwen 等模型"）不触发翻译
+- [x] CJK ≤ 15% 的纯英文文本正确调用百度翻译
+- [x] 翻译队列异步执行，不阻塞主抓取流程
+- [x] 多条文章打包一次批量翻译请求（单次 ≤ 6000 字符）
+- [x] 百度翻译 API 失败时保留原文，异步队列下次重试
+- [x] ON CONFLICT 更新时已有翻译结果不重复调用
+- [x] 翻译结果写入 title_zh / summary_zh，前端 title_zh !== '' 时展示翻译版
+
+**GitHub 历史热门 AI 仓库**
+- [x] 常青榜首批种子数据 Top 20-30 高星 AI 仓库入库，按 stars desc 排序
+- [x] 新锐榜展示近 30 天 star 增量最快的 AI 项目（每次抓取同步更新）
+- [x] 常青榜按周增量更新，不重复入库
+- [x] 常青榜与新锐榜在工具榜 Tab 分区展示
+- [x] GitHub Search API 使用 GITHUB_TOKEN 认证，5000 次/小时配额正常
+- [x] 未配置 GITHUB_TOKEN 时降级跳过（不阻塞抓取）
+- [x] 长青榜封顶 70°C，避免长期推荐内容霸占首页
+
+**爆料编辑 / 预览 / 验证**
+- [x] PATCH /api/admin/articles/:id 编辑已发布爆料
+- [x] 可修改字段：标题、URL、摘要、标签、配图、分类
+- [x] URL 修改时若新 URL 已存在，返回 409
+- [x] 标签修改为全量覆盖（非增量追加）
+- [x] 编辑表单提交前实时渲染卡片预览，样式与前端一致
+- [x] 表单字段实时校验（标题/URL/摘要非空，URL 格式校验）
+- [x] 错误提示在对应字段下方显示
+
+**新增 RSS 数据源**
+- [x] Product Hunt 正常抓取展示
+- [x] Product Hunt 非 AI 内容（游戏/设计工具/营销 SaaS 等）被 AI 关键词白名单过滤
+- [x] Hacker News / OpenAI Blog / Google AI Blog / HuggingFace Blog 正常抓取
+- [x] Hacker News AI 关键词过滤生效（正则 `(?<!\.)\bAI\b(?!\.)` 避免 .ai TLD 误匹配）
+- [x] Hacker News 空摘要处理：仅含 "Comments" 的 summary 置为空字符串
+- [x] 新源内容带有正确来源标签和热度评分（base_score 按定义：PH=55, HN=50, 官方博客=65）
+
+**置顶机制** `(v1.1 acceptance 新增)`
+- [x] 管理员可置顶/取消置顶爆料文章
+- [x] 置顶文章热度随时间衰减：99→95→90→85→普通
+- [x] 置顶卡片在排序中优先展示（同分 tiebreaker）
+- [x] 置顶卡片带红色"置顶"角标
+- [x] 旧置顶（72h+）自动降为普通评分，不再特殊排序
+
+**热度评分平衡** `(v1.1 acceptance 新增)`
+- [x] GitHub 星数分档整体降 5 分，减少 GitHub 霸占首页
+- [x] 图片/标签加分从 +5 收窄至 +3
+- [x] 各源 base 最终定稿：news=55, podcast=60, 36kr/sv101=50, blog=65, HN=50, PH=55
+- [x] 长青榜封顶 70°C（抓取 + 单篇重算 + 批量重算三路覆盖）
+- [x] 前 25 条覆盖 6+ 不同数据源，多样性达标
 
 ---
 
@@ -944,12 +1093,16 @@ recency_boost（时间衰减）:
 
 | 变更 | 类型 | 说明 |
 |------|------|------|
-| 英文内容翻译 | 功能 | 接入百度翻译 API，非中文标题/摘要自动翻译展示，CJK >30% 跳过 |
+| 英文内容翻译 | 功能 | 接入百度翻译 API，非中文标题/摘要自动翻译展示，CJK >15% 跳过 |
 | GitHub 历史热门 AI 仓库 | 功能 | GitHub Search API 双通道搜索，种子 50 条 + 每周增量更新 |
-| 爆料编辑 | 管理 | 新增 PATCH /api/admin/articles/:id，支持修改标题/摘要/标签/图片 |
+| 爆料编辑 | 管理 | 新增 PATCH /api/admin/articles/:id，支持修改标题/摘要/标签/图片/置顶 |
 | 爆料预览 | 管理 | 管理表单实时渲染卡片预览，所见即所得 |
 | 爆料表单验证 | 管理 | 前端实时校验必填字段和 URL 格式 |
 | 新增数据源 | 数据 | Product Hunt、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog |
+| 置顶机制 | 功能 | 置顶/取消置顶 + 热度衰减（99→95→90→85→普通）+ 红色角标 |
+| 热度评分平衡 | 优化 | GitHub 星数降 5 分，加分收窄 5→3，base 微调，长青榜封顶 70°C |
+| AI 内容过滤增强 | 优化 | HN 新增 AI 过滤，统一正则 \b 边界，HN 空摘要清理 |
+| 排序策略 | 优化 | ORDER BY 增加 is_pinned / pinned_at 作为 tiebreaker |
 
 ### C. 竞品参考列表
 | 产品 | 网址 | 参考价值 |

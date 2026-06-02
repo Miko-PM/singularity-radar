@@ -4,6 +4,7 @@ import { Source, Article } from '../types/index.js';
 import { tagArticle } from './tagger.js';
 import { calculateHeatScore, getHoursAgo } from './heatScore.js';
 import { generateHotTopics } from './hotTopics.js';
+import { fetchRisingRepos } from './gitHubHistory.js';
 import { XMLParser } from 'fast-xml-parser';
 import * as cheerio from 'cheerio';
 
@@ -252,15 +253,22 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
 
       // 提取 URL
       let link = extractField(item, 'link', 'id');
-      // Atom link is an array
+      // Atom link is an object or array with @_href
       if (Array.isArray(item.link)) {
         const altLink = item.link.find((l: any) => l['@_rel'] === 'alternate' || !l['@_rel']);
         link = altLink?.['@_href'] || item.link[0]?.['@_href'] || link;
+      } else if (typeof item.link === 'object' && item.link?.['@_href']) {
+        link = item.link['@_href'];
       }
-      if (!link) continue;
+      // 过滤非 URL 的 id（如 tag:xxx 格式）
+      if (!link || !/^https?:\/\//.test(link)) continue;
 
       // 提取摘要
       let summary = stripHTML(extractField(item, 'summary', 'description', 'itunes:summary', 'content:encoded', 'content'));
+      // HN 等源的 description 只有评论链接，无实质内容
+      if (!summary || summary === 'Comments' || summary === 'Comment') {
+        summary = '';
+      }
       if (summary.length > 500) summary = summary.slice(0, 500);
 
       // 提取作者
@@ -274,9 +282,28 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
 
       // 36氪仅保留 AI 相关文章（过滤财经/股市类噪音）
       if (source.slug === '36kr') {
-        const aiPattern = /AI|人工智能|大模型|机器学习|深度学习|LLM|GPT|ChatGPT|机器人|自动驾驶|芯片|半导体|算法|算力|神经|视觉|语言|生成式|AIGC|Agent|多模态|参数|开源|扩散|Transformer|transformer|Attention|attention|微软|谷歌|Google|Meta|Facebook|Apple|苹果|英伟达|NVIDIA|AMD|英特尔|Intel|高通|Qualcomm|华为|百度|阿里|腾讯|字节|京东|OpenAI|Anthropic|Claude|Gemini|Gemma|Llama|Mistral|Stability|Midjourney|Sora|Copilot|AutoGPT|液冷|光模块/i;
+        // 两层过滤：必须匹配 AI 核心技术词，公司名单独出现不放行
+        const aiCore = /AI|人工智能|大模型|机器学习|深度学习|LLM|GPT|ChatGPT|机器人|自动驾驶|芯片|半导体|算法|算力|神经[网路]?|视觉|生成式|AIGC|Agent|多模态|开源|扩散模型|Transformer|Attention|语言模型|自然语言|图像识别|推荐算法|强化学习|机器视觉|语音识别|计算机视觉|NLP|CLIP|VLM|RAG|MoE|知识图谱|文心|通义|混元|盘古|星火|Copilot|AutoGPT|液冷|光模块|prompt|token|embedding|fine.?tun|RLHF|synthetic.?data|sora|midjourney|stable.?diffusion|llama|mistral|claude|gemini|gemma|anthropic|openai|目标检测|语义分割|NER|文本生成|代码生成|图像生成|视频生成|向量数据库|检索增强|推理加速|模型压缩|量化|蒸馏|微调|对齐|agent|function.?call|tool.?use|视觉语言/i;
         const combined = `${title} ${summary}`;
-        if (!aiPattern.test(combined)) {
+        if (!aiCore.test(combined)) {
+          continue; // 跳过非 AI 内容
+        }
+      }
+
+      // V1.1: Product Hunt AI 内容过滤
+      if (source.slug === 'product_hunt') {
+        const aiKeywords = /\bAI\b|artificial intelligence|machine learning|LLM|GPT|chatbot|copilot|automation|deep learning|neural|computer vision|NLP|recommendation|predictive|analytics|data science|natural language|transformer|diffusion|embedding|vector|\bRAG\b|agent|pipeline|fine.?tun|rlhf|synthetic|autonomous|vision|speech|text.?to.?|generat|intelligence/i;
+        const combined = `${title} ${summary}`;
+        if (!aiKeywords.test(combined)) {
+          continue; // 跳过非 AI 内容
+        }
+      }
+
+      // Hacker News AI 内容过滤（仅保留 AI 相关帖子）
+      if (source.slug === 'hacker_news') {
+        const hnAiKeywords = /(?<!\.)\bAI\b(?!\.)|artificial intelligence|machine learning|LLM|GPT|chatbot|copilot|automation|deep learning|neural|computer vision|NLP|recommendation|predictive|analytics|data science|natural language|transformer|diffusion|embedding|vector|\bRAG\b|agent|pipeline|fine.?tun|rlhf|synthetic|autonomous|vision|speech|text.?to.?|generat|intelligence|openai|anthropic|google.*(?<!\.)\bAI\b(?!\.)|meta.*(?<!\.)\bAI\b(?!\.)|claude|gemini|llama|mistral|chatgpt|codex|groq|sora|midjourney|stability|hugging.?face|gradient|backprop|attention|token|prompt|model.*weight|inference|GPU|H100|A100|CUDA|PyTorch|TensorFlow|JAX|vector.*db|augmented.*generation|knowledge.*graph|semantic.*search|neural.*net|deep.*learning|reinforcement.*learning|supervised|unsupervised|GAN|diffusion.*model|foundation.*model|frontier.*model|caption|object.*detection|image.*generation|text.*generation|code.*generation|self.?driving|robotics|\bchip\b|semiconductor|processor|compute.*infra|data.*center|training.*run|inference.*cost/i;
+        const combined = `${title} ${summary}`;
+        if (!hnAiKeywords.test(combined)) {
           continue; // 跳过非 AI 内容
         }
       }
@@ -379,6 +406,10 @@ export async function fetchAll(): Promise<FetchResult[]> {
     results.push(result);
     console.log(`[Fetch] ${source.name}: ${result.success ? 'OK' : 'FAIL'} (${result.newCount} new, ${result.elapsed}ms)`);
   }
+
+  // 新锐榜：每次抓取同步更新
+  console.log('[Fetch] Fetching rising repos...');
+  await fetchRisingRepos();
 
   // 生成热门议题
   console.log('[Fetch] Generating hot topics...');

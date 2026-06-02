@@ -44,8 +44,8 @@ align_left_wrap = Alignment(horizontal='left', vertical='center', wrap_text=True
 # ============================================================
 # 列定义
 # ============================================================
-headers = ['编号', '模块', '功能点', '优先级', '验收标准', '状态', '问题类型', '备注', 'DEV反馈修复状态', 'DEV备注']
-col_widths = [10, 14, 34, 8, 55, 12, 14, 40, 20, 42]
+headers = ['编号', '模块', '功能点', '优先级', '验收标准', '验收时间', '状态', '问题类型', '产品备注', 'DEV备注']
+col_widths = [10, 14, 34, 8, 55, 16, 12, 14, 40, 42]
 
 # ============================================================
 # 验收项目数据
@@ -259,7 +259,7 @@ ws.row_dimensions[2].height = 24
 # ── Status legend row 3 ──
 ws.merge_cells('A3:J3')
 cell = ws.cell(row=3, column=1,
-               value='验收状态：通过 ｜ 不通过 ｜ 部分通过 ｜ 待重测 ｜ 跳过')
+               value='验收状态：通过 ｜ 不通过 ｜ 部分通过 ｜ 暂不修复 ｜ 跳过 ｜ 已修复待验证 ｜ 待确认')
 cell.font = Font(name='Inter', size=10, color=MED_TEXT)
 cell.fill = PatternFill(start_color=WHITE, end_color=WHITE, fill_type='solid')
 cell.alignment = align_center
@@ -270,7 +270,7 @@ ws.row_dimensions[3].height = 22
 # ── Type + DEV legend row 4 ──
 ws.merge_cells('A4:J4')
 cell = ws.cell(row=4, column=1,
-               value='问题类型：BUG ｜ 体验优化 ｜ 需求变更　　　　DEV反馈：已修复 ｜ 非BUG待确认 ｜ 待修复 ｜ 需确认')
+               value='问题类型：BUG ｜ 体验优化 ｜ 需求变更　　　　DEV与产品经理共用状态列，两种角色在同一列更新进度')
 cell.font = Font(name='Inter', size=10, color=MED_TEXT)
 cell.fill = PatternFill(start_color=LIGHT_GRAY, end_color=LIGHT_GRAY, fill_type='solid')
 cell.alignment = align_center
@@ -337,13 +337,23 @@ for item in items:
         row_fill = p2_fill
 
     for c in range(1, 11):
-        cell = ws.cell(row=row, column=c, value=item[c - 1])
+        # col mapping: 旧 item 索引 → 新列位置
+        # F(Col 6)=验收时间，由用户填写，生成时为空
+        if c == 6:
+            val = ''
+        elif c == 10:
+            val = item[9]   # DEV备注
+        elif c > 6:
+            val = item[c - 2]  # G=item[5], H=item[6], I=item[7]
+        else:
+            val = item[c - 1]  # A-E = item[0-4]
+        cell = ws.cell(row=row, column=c, value=val)
         cell.font = cell_font
         cell.fill = row_fill
         cell.border = thin_border
-        if c in (1, 4, 6, 7):
+        if c in (1, 4, 6, 7, 8):
             cell.alignment = align_center
-        elif c in (3, 5, 8, 9, 10):
+        elif c in (3, 5, 9, 10):
             cell.alignment = align_left_wrap
         else:
             cell.alignment = Alignment(vertical='center')
@@ -352,17 +362,19 @@ for item in items:
     row += 1
 
 # ── Data validation dropdowns ──
-dv_status = DataValidation(type='list', formula1='"通过,不通过,部分通过,待重测,跳过"', allow_blank=True)
-dv_status.add(f'F7:F{row - 1}')
+# F=验收时间（无验证，datetime 格式）
+# G=状态（合并列，产品经理与 DEV 共用）
+dv_status = DataValidation(type='list', formula1='"通过,不通过,部分通过,暂不修复,跳过,已修复待验证,待确认"', allow_blank=True)
+dv_status.add(f'G7:G{row - 1}')
 ws.add_data_validation(dv_status)
 
+# H=问题类型
 dv_type = DataValidation(type='list', formula1='"BUG,体验优化,需求变更"', allow_blank=True)
-dv_type.add(f'G7:G{row - 1}')
+dv_type.add(f'H7:H{row - 1}')
 ws.add_data_validation(dv_type)
 
-dv_dev = DataValidation(type='list', formula1='"已修复,非BUG待确认,待修复,需确认"', allow_blank=True)
-dv_dev.add(f'I7:I{row - 1}')
-ws.add_data_validation(dv_dev)
+# I=产品备注（文本，无验证）
+# J=DEV备注（文本，无验证）
 
 # ── Excel Table (for robust filtering) ──
 ref = f'A6:J{row - 1}'

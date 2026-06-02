@@ -4,21 +4,29 @@ import { Source, Article } from '../types/index.js';
 /**
  * 计算热度评分（抓取时计算）
  *
- * 公式: raw = base × recency_boost + bonus
- * 最终: min(round(raw / MAX_RAW × 100), 100) °C
+ * 公式: score = min(base × recency_boost + bonus, 100) °C
+ * - base: 数据源类型的基础分（GitHub 按星数分档）
+ * - recency_boost: 发布时间越近加成越高（1.0 ~ 1.5）
+ * - bonus: 有图 +5，≥3 标签 +5
+ * - 管理员置顶文章 3 天内固定 99°C
  *
- * MAX_RAW = 150 — 理论最高原始分（GitHub 万星 + 最近 + 满加成）
- * 管理员置顶文章直接返回 99°C（不参与归一化），3 天后自动过期
+ * 设计原则：
+ * - 爆火的 GitHub 仓库可达 90°C，普通仓库 30-50°C
+ * - 头部 AI 资讯（马斯克/黄仁勋等）可达 80-90°C
+ * - 播客/深度内容 60-85°C
+ * - 论文 40-65°C
+ * - 没有归一化硬上限，允许热内容自然突破
  */
-const MAX_RAW = 150;
 
-/** GitHub star 分档 */
+/** GitHub star 分档（整体降 5 分，避免霸占首页） */
 function gitHubBase(stars?: number): number {
-  if (!stars || stars < 100) return 80;
-  if (stars < 500) return 85;
-  if (stars < 2000) return 90;
-  if (stars < 10000) return 95;
-  return 100; // ≥10000★
+  if (!stars || stars < 100) return 20;
+  if (stars < 500) return 30;
+  if (stars < 2000) return 40;
+  if (stars < 10000) return 45;
+  if (stars < 50000) return 50;
+  if (stars < 100000) return 55;
+  return 60; // ≥100000★
 }
 
 export function calculateHeatScore(
@@ -30,10 +38,14 @@ export function calculateHeatScore(
   isPinned?: boolean,
   pinnedAt?: string
 ): number {
-  // 管理员置顶：3 天内固定 99°C
+  // 管理员置顶衰减：99°C → 逐渐降至正常评分，72h 后走普通公式
   if (category === 'admin' && isPinned && pinnedAt) {
     const hoursSincePin = getHoursAgo(pinnedAt);
-    if (hoursSincePin < 72) return 99;
+    if (hoursSincePin <= 12) return 99;
+    if (hoursSincePin <= 24) return 95;
+    if (hoursSincePin <= 48) return 90;
+    if (hoursSincePin <= 72) return 85;
+    // 超过 72h：降级为普通管理员 base，但仍保留置顶排序优先
   }
 
   // base_score
@@ -43,25 +55,36 @@ export function calculateHeatScore(
       base = gitHubBase(stars);
       break;
     case 'paper':
-      base = 50;
+      base = 40;
       break;
     case 'news':
-      base = 60;
+      base = 55;
       break;
     case '36kr':
       base = 50;
       break;
     case 'podcast':
-      base = 70;
+      base = 60;
       break;
     case 'sv101':
       base = 50;
       break;
     case 'admin':
-      base = 90; // 非置顶管理员爆料
+      base = 75; // 非置顶管理员爆料
+      break;
+    case 'product_hunt':
+      base = 55;
+      break;
+    case 'hacker_news':
+      base = 50;
+      break;
+    case 'openai_blog':
+    case 'google_ai_blog':
+    case 'huggingface_blog':
+      base = 65; // 官方 AI 公司博客，与 100K★ GitHub 同级
       break;
     default:
-      base = 45;
+      base = 40;
   }
 
   // recency_boost
@@ -73,14 +96,14 @@ export function calculateHeatScore(
     else boost = 1.0;
   }
 
-  // 额外加分
+  // 额外加分（收窄，避免新闻聚合站因图片+标签堆积过量）
   let bonus = 0;
-  if (hasImage) bonus += 5;
-  if (tagCount !== undefined && tagCount >= 3) bonus += 5;
+  if (hasImage) bonus += 3;
+  if (tagCount !== undefined && tagCount >= 3) bonus += 3;
 
-  // 归一化到 0–100 °C
+  // 直接封顶 100°C，不归一化
   const raw = base * boost + bonus;
-  return Math.min(Math.round((raw / MAX_RAW) * 100), 100);
+  return Math.min(Math.round(raw), 100);
 }
 
 export function getHoursAgo(dateStr: string): number {
@@ -107,6 +130,11 @@ export async function scoreArticle(article: Article): Promise<number> {
   if (slug === '36kr') categoryForScore = '36kr';
   if (slug === 'sv101') categoryForScore = 'sv101';
   if (slug === 'admin_post') categoryForScore = 'admin';
+  if (slug === 'product_hunt') categoryForScore = 'product_hunt';
+  if (slug === 'hacker_news') categoryForScore = 'hacker_news';
+  if (slug === 'openai_blog') categoryForScore = 'openai_blog';
+  if (slug === 'google_ai_blog') categoryForScore = 'google_ai_blog';
+  if (slug === 'huggingface_blog') categoryForScore = 'huggingface_blog';
 
   const hasImage = !!article.image_url;
   const tagRes = await query(`SELECT COUNT(*) AS cnt FROM article_tags WHERE article_id = $1`, [article.id]);
@@ -114,8 +142,11 @@ export async function scoreArticle(article: Article): Promise<number> {
 
   const isPinned = (article as any).is_pinned === true;
   const pinnedAt = (article as any).pinned_at;
+  const stars = (article as any).stars;
 
-  const score = calculateHeatScore(categoryForScore, undefined, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);
+  let score = calculateHeatScore(categoryForScore, stars, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);
+  // 长青榜封顶 70（长期推荐不霸榜）
+  if (slug === 'github_evergreen') score = Math.min(score, 70);
 
   await query(`UPDATE articles SET hot_score = $1 WHERE id = $2`, [score, article.id]);
 
@@ -141,6 +172,11 @@ export async function reheatAll(): Promise<number> {
     if (sourceSlug === '36kr') catForScore = '36kr';
     if (sourceSlug === 'sv101') catForScore = 'sv101';
     if (sourceSlug === 'admin_post') catForScore = 'admin';
+    if (sourceSlug === 'product_hunt') catForScore = 'product_hunt';
+    if (sourceSlug === 'hacker_news') catForScore = 'hacker_news';
+    if (sourceSlug === 'openai_blog') catForScore = 'openai_blog';
+    if (sourceSlug === 'google_ai_blog') catForScore = 'google_ai_blog';
+    if (sourceSlug === 'huggingface_blog') catForScore = 'huggingface_blog';
 
     const hasImage = !!article.image_url;
     const tagRes = await query(`SELECT COUNT(*) AS cnt FROM article_tags WHERE article_id = $1`, [article.id]);
@@ -148,8 +184,10 @@ export async function reheatAll(): Promise<number> {
 
     const isPinned = (article as any).is_pinned === true;
     const pinnedAt = (article as any).pinned_at;
+    const stars = (article as any).stars;
 
-    const score = calculateHeatScore(catForScore, undefined, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);
+    let score = calculateHeatScore(catForScore, stars, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);
+    if (sourceSlug === 'github_evergreen') score = Math.min(score, 70);
     await query(`UPDATE articles SET hot_score = $1 WHERE id = $2`, [score, article.id]);
     count++;
   }

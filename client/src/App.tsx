@@ -22,6 +22,14 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+    // 同步更新 html 背景色（防止 inline style 与 CSS 变量不同步）
+    if (theme === 'light') {
+      document.documentElement.style.backgroundColor = '#f9f9ff';
+      document.documentElement.style.color = '#141b2b';
+    } else {
+      document.documentElement.style.backgroundColor = '#0c0c0c';
+      document.documentElement.style.color = '#ececeb';
+    }
   }, [theme]);
 
   // Fetch sources & tags for sidebar
@@ -76,12 +84,15 @@ export default function App() {
 
           {/* Desktop brand — spans full width, above sidebar */}
           <div className="hidden md:flex items-baseline gap-3">
-            <h1 className="font-headline text-xl md:text-2xl not-italic font-bold bg-gradient-to-r from-[var(--gold)] via-[var(--gold-gradient-2)] to-[var(--gold-gradient-3)] bg-clip-text text-transparent tracking-wider">
-              Singularity Radar
+            <h1 className="flex items-baseline gap-2">
+              <span className="font-headline text-xl md:text-2xl not-italic font-bold bg-gradient-to-r from-[var(--gold)] via-[var(--gold-gradient-2)] to-[var(--gold-gradient-3)] bg-clip-text text-transparent tracking-wider">
+                奇点雷达
+              </span>
+              <span className="hidden md:inline text-[var(--text-muted)] text-[11px]">·</span>
+              <span className="font-label text-[11px] md:text-xs text-[var(--text-muted)] tracking-wide">
+                Singularity Radar
+              </span>
             </h1>
-            <span className="font-label text-xs text-[var(--gold-bright)]/70 tracking-[0.15em]">
-              · 奇点雷达
-            </span>
           </div>
 
           {/* Mobile title */}

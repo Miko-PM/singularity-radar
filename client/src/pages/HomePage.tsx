@@ -17,7 +17,7 @@ interface Props {
 
 export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagClick }: Props) {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [timeRange, setTimeRange] = useState<'week' | 'all'>('week');
+  const [timeRange, setTimeRange] = useState<'week' | 'all'>('all');
 
   const params: Record<string, string> = {};
   if (tab !== 'hot') params.tab = tab;
@@ -27,11 +27,10 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
   if (chineseOnly) params.lang = 'zh';
   if (timeRange === 'week') params.days = '7';
 
-  const { data: articlesData, loading, error, refetch } = useArticles(params);
+  const { articles, loading, loadingMore, error, hasMore, loadMore, refetch, allLoaded } = useArticles(params);
   const { data: hotTopics, loading: topicsLoading } = useHotTopics();
 
-  // 文章列表（所有 Tab 都需要 hooks 保持一致）
-  const articles = articlesData || [];
+  // 文章列表 — useArticles 现在直接返回 articles 数组
 
   // Hero card: pick first article with hot_score >= 80 (in list mode only)
   const heroArticle = useMemo(() => {
@@ -148,17 +147,32 @@ export default function HomePage({ tab, filter, tag, source, chineseOnly, onTagC
           ))}
         </div>
       )}
+
+      {/* Load more or all loaded */}
+      {!loading && !error && !allLoaded && listArticles.length > 0 && (
+        <div className="flex justify-center mt-8 mb-4">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="font-label text-sm px-8 py-2.5 rounded-xl bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] hover:bg-[var(--gold-bg)]/15 transition-colors disabled:opacity-40"
+          >
+            {loadingMore ? '加载中…' : '加载更多'}
+          </button>
+        </div>
+      )}
+      {!loading && !error && allLoaded && (
+        <div className="flex justify-center mt-8 mb-4">
+          <span className="text-sm text-[var(--text-muted)]">已全部加载完成</span>
+        </div>
+      )}
     </div>
   );
 }
 
 function FeaturedSection() {
-  const { data: featured, loading } = useArticles({ filter: 'hot', limit: '1' });
+  const { articles, loading } = useArticles({ filter: 'hot', limit: '1' });
 
   if (loading) return null;
-
-  const articles = featured || [];
-  if (articles.length === 0) return null;
 
   const top = articles[0];
   if (!top) return null;

@@ -6,10 +6,11 @@
 |------|------|------|---------|
 | v0.1 | 2026-05-28 | Claude | 初稿 |
 | v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、published_at 修复、部署架构更新 |
+| v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源。新增环境变量：BAIDU_TRANSLATE_APPID/KEY、GITHUB_TOKEN |
 
 ## 项目概述
 
-AI 资讯聚合平台，自动采集 GitHub Trending、arXiv、AI 新闻（36氪/雷峰网）、播客（Lenny's Podcast/硅谷101），跨源聚合热门议题。V1.0 已正式上线。
+AI 资讯聚合平台，自动采集 GitHub Trending、arXiv、AI 新闻（36氪/雷峰网）、播客（Lenny's Podcast/硅谷101）、技术社群（Hacker News）、AI 工具（Product Hunt）、官方博客（OpenAI/Google/HuggingFace），跨源聚合热门议题。V1.0 已正式上线，V1.1 新增多源覆盖与英文翻译。
 
 ## 技术栈
 
@@ -95,8 +96,9 @@ interface ApiResponse<T> {
 - SQL 查询使用参数化查询（`$1, $2`），禁止拼接 SQL
 - Schema 迁移：`server/src/db/schema.sql` 为初始 Schema，后续变更追加到 `migrations/`
 - `sources` 表包含 `fallback_urls TEXT` 字段，存储 JSON 数组备用 RSS 地址
+- `articles` 表包含 `title_zh TEXT DEFAULT ''` / `summary_zh TEXT DEFAULT ''`（翻译字段）、`is_pinned BOOLEAN DEFAULT FALSE` / `pinned_at TIMESTAMP`（置顶字段）、`is_admin_post BOOLEAN DEFAULT FALSE` / `is_featured BOOLEAN DEFAULT FALSE`
 - **关键约定：RSS 抓取任务顺序执行（非并行）**，避免数据库连接争抢
-- 数据源清单：GitHub Trending、arXiv、36氪、雷峰网、Lenny's Podcast、硅谷101、管理员爆料（机器之心已禁用）
+- 数据源清单：GitHub Trending、arXiv、36氪、雷峰网、Lenny's Podcast、硅谷101、管理员爆料、Product Hunt、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog（机器之心已禁用）
 
 ### 后端 API
 
@@ -151,24 +153,54 @@ interface ApiResponse<T> {
 
 ### 热度评分（抓取时计算）
 
-```
-hot_score = base_score × recency_boost
+**公式：** `hot_score = min(round(base × recency_boost + bonus), 100) °C`
 
-base_score（数据源基础权重）:
-  - GitHub Trending: 65 + star_count / 10000
-  - arXiv 论文: 55
-  - 36氪: 60
-  - 雷峰网: 50
-  - Lenny's Podcast: 70
-  - 硅谷101: 60
-  - 管理员爆料: 75
+管理员置顶文章时效内固定 99°C，随 72h 逐渐衰减至正常评分。
 
-recency_boost（时间衰减）:
-  - 12 小时内: 1.5
-  - 24 小时内: 1.3
-  - 48 小时内: 1.1
-  - 超过 48 小时: 1.0
-```
+#### base_score（数据源基础权重）
+
+| 数据源 | category/slug | base_score | 说明 |
+|--------|---------------|-----------|------|
+| GitHub Trending / 历史仓库 | `opensource` | **分档制**：★<100→20, <500→30, <2000→40, <10000→45, <50000→50, <100000→55, ≥100K→60 | star 越高档位越高。V1.1 整体降 5 分，避免 GitHub 霸占首页 |
+| arXiv cs.AI | `paper` | 40 | 论文基准 |
+| 36氪 | `36kr` (slug 映射) | 50 | 中文 AI 媒体，AI 过滤后质量较高 |
+| 雷峰网 | `news` | 55 | 通用资讯 |
+| Lenny's Podcast | `podcast` | 60 | 独特性加成 |
+| 硅谷101 | `sv101` (slug 映射) | 50 | 播客基准 |
+| 管理员爆料 | `admin` | 75 | 人工录入价值高，非置顶 |
+| Product Hunt (v1.1) | `product_hunt` 需 slug 映射 | 55 | 工具类 |
+| Hacker News (v1.1) | `hacker_news` 需 slug 映射 | 50 | 社区内容 |
+| OpenAI Blog (v1.1) | `openai_blog` 需 slug 映射 | 65 | 官方 AI 公司博客 |
+| Google AI Blog (v1.1) | `google_ai_blog` 需 slug 映射 | 65 | 官方 AI 公司博客 |
+| HuggingFace Blog (v1.1) | `huggingface_blog` 需 slug 映射 | 65 | 官方 AI 公司博客 |
+| 默认（未匹配） | — | 40 | 最低档，避免新源异常值 |
+
+#### recency_boost（时间衰减）
+
+- 12 小时内: 1.5
+- 24 小时内: 1.3
+- 48 小时内: 1.1
+- 超过 48 小时: 1.0
+
+#### bonus（额外加分）
+
+- 有配图: +3（V1.1 从 +5 收窄）
+- ≥3 个标签: +3（V1.1 从 +5 收窄）
+
+#### 管理员置顶衰减
+
+| 时间窗口 | 热度 | 说明 |
+|---------|------|------|
+| 0-12 小时 | 99°C | 固定满分 |
+| 12-24 小时 | 95°C | 轻微衰减 |
+| 24-48 小时 | 90°C | 明显衰减 |
+| 48-72 小时 | 85°C | 持续衰减 |
+| 72 小时+ | 普通评分 | 降为 admin base 75，不再特殊排序 |
+
+#### 长青榜封顶
+
+- GitHub 常青榜（slug: `github_evergreen`）封顶 **70°C**
+- 在 `insertRepo()`、`scoreArticle()`、`reheatAll()` 三路均做检查
 
 ## 注意事项
 
@@ -195,6 +227,9 @@ recency_boost（时间衰减）:
   - `RSSHUB_FALLBACK` — RSSHub 备用实例
   - `NODE_ENV` — `production`
   - `PORT` — 3001
+  - `BAIDU_TRANSLATE_APPID` — 百度翻译 API AppID（v1.1 翻译用）
+  - `BAIDU_TRANSLATE_KEY` — 百度翻译 API Key（v1.1 翻译用）
+  - `GITHUB_TOKEN` — GitHub Personal Access Token（v1.1 历史仓库搜索用，认证后 5000 次/小时，未认证仅 60 次/小时）
 - 启动命令：`npm start`
 - 健康检查：`/api/health`
 

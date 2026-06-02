@@ -66,6 +66,11 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
               <span className="absolute top-4 left-4 font-label text-[11px] px-3 py-1 rounded-full bg-black/60 text-[var(--text-secondary)] backdrop-blur-sm border border-white/10 z-10">
                 {article.source_name || getCategoryLabel(article.category)}
               </span>
+              {article.is_pinned && (
+                <span className="absolute top-4 left-24 font-label text-[11px] px-3 py-1 rounded-full bg-amber-900/60 text-amber-300 backdrop-blur-sm border border-amber-500/30 z-10">
+                  置顶
+                </span>
+              )}
               {isAdmin && (
                 <span className="absolute top-4 right-4 font-label text-[11px] px-3 py-1 rounded-full bg-red-900/60 text-red-300 backdrop-blur-sm border border-red-500/30 z-10">
                   爆料
@@ -84,6 +89,11 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
             )}
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border-primary)]">
               <div className="flex items-center gap-3">
+                {article.is_pinned && (
+                  <span className="font-label text-[11px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-500/30">
+                    置顶
+                  </span>
+                )}
                 <span className="font-label text-sm" style={{ color: heatToColor(article.hot_score) }}>
                   ● {article.hot_score}°C
                 </span>
@@ -118,12 +128,19 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
             {/* Text area — left side */}
             <div className="flex-1 min-w-0 p-5 md:p-6 flex flex-col justify-between">
               <div>
-                {/* Admin badge */}
-                {isAdmin && (
-                  <span className="inline-block font-label text-[10px] px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 mb-2 border border-red-500/30">
-                    爆料
-                  </span>
-                )}
+                {/* Badges */}
+                <div className="flex gap-1.5 mb-2 flex-wrap">
+                  {article.is_pinned && (
+                    <span className="inline-block font-label text-[10px] px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 border border-amber-500/30">
+                      置顶
+                    </span>
+                  )}
+                  {isAdmin && (
+                    <span className="inline-block font-label text-[10px] px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 border border-red-500/30">
+                      爆料
+                    </span>
+                  )}
+                </div>
                 <h2 className="font-headline text-base md:text-lg leading-snug text-[var(--text-primary)] group-hover:text-[var(--gold)] transition-colors duration-300 line-clamp-2">
                   {article.title}
                 </h2>
@@ -157,6 +174,11 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
                 {/* Meta */}
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-primary)]">
                   <div className="flex items-center gap-2">
+                    {article.is_pinned && (
+                      <span className="font-label text-[11px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-500/30">
+                        置顶
+                      </span>
+                    )}
                     <span className="font-label text-xs" style={{ color: heatToColor(article.hot_score) }}>
                       ● {article.hot_score}°C
                     </span>
@@ -215,9 +237,19 @@ export default function ArticleCard({ article, onTagClick, variant = 'default', 
             <span className="absolute top-3 left-3 font-label text-[10px] px-2 py-0.5 rounded-full bg-black/60 text-[var(--text-secondary)] backdrop-blur-sm border border-white/10">
               {article.source_name || getCategoryLabel(article.category)}
             </span>
-            {/* Admin badge */}
+            {/* Pin badge */}
+            {article.is_pinned && (
+              <span className="absolute top-3 right-3 font-label text-[10px] px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 backdrop-blur-sm border border-amber-500/30">
+                置顶
+              </span>
+            )}
+            {/* Admin badge (offset if also pinned) */}
             {isAdmin && (
-              <span className="absolute top-3 right-3 font-label text-[10px] px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 backdrop-blur-sm border border-red-500/30">
+              <span className={`absolute font-label text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm border ${
+                article.is_pinned
+                  ? 'top-10 right-3 bg-red-900/60 text-red-300 border-red-500/30'
+                  : 'top-3 right-3 bg-red-900/60 text-red-300 border-red-500/30'
+              }`}>
                 爆料
               </span>
             )}

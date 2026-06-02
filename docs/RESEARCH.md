@@ -1,6 +1,6 @@
 # Singularity Radar · 需求研究（最终版）
 
-> 最后更新：2026-06-01（V1.0 正式发布）
+> 最后更新：2026-06-02（V1.1 规划完成）
 
 ## 修订历史
 
@@ -8,6 +8,7 @@
 |------|------|------|---------|
 | v0.1 | 2026-05-27 | Claude | 需求研究初稿 |
 | v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、published_at 修复、部署调整 |
+| v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史仓库、爆料编辑/预览、新增 RSS 数据源。环境变量新增 BAIDU_TRANSLATE_APPID/KEY、GITHUB_TOKEN |
 
 ---
 
@@ -75,6 +76,9 @@
 | `PORT` | 后端端口 | 3001 |
 | `DATABASE_URL` | Supabase PostgreSQL 连接字符串 | 必填 |
 | `NODE_ENV` | 环境模式 | 生产环境为 `production` |
+| `BAIDU_TRANSLATE_APPID` | 百度翻译 API AppID（v1.1） | 必填（启用翻译时） |
+| `BAIDU_TRANSLATE_KEY` | 百度翻译 API Key（v1.1） | 必填（启用翻译时） |
+| `GITHUB_TOKEN` | GitHub Personal Access Token（v1.1） | 可选（未认证 60次/小时，认证后 5000次/小时） |
 
 ### API 接口清单
 
@@ -87,6 +91,7 @@
 | GET | `/api/hot-topics` | 获取热门议题聚合 | 无 | — |
 | GET | `/api/sources` | 获取数据源状态 | 无 | — |
 | POST | `/api/admin/articles` | 管理员录入爆料 | Bearer Token | `title`, `url`, `summary`, `tags`, `category`, `image_url` |
+| PATCH | `/api/admin/articles/:id` | 管理员编辑爆料（v1.1） | Bearer Token | title, url, summary, tags, category, image_url |
 | POST | `/api/admin/fetch` | 手动触发全量抓取 | Bearer Token | — |
 | POST | `/api/admin/retag` | 全量重新打标签 | Bearer Token | — |
 | POST | `/api/admin/reheat` | 全量重算热度评分 | Bearer Token | — |
@@ -101,12 +106,19 @@
 | 数据源 | 类型 | 获取方式 | 更新频率 | 优先级 | 状态 |
 |--------|------|---------|---------|--------|------|
 | GitHub Trending | 开源项目 | HTML Scraper | 每日 | P0 | ✅ |
+| GitHub 历史热门 AI 仓库（常青榜） | 开源项目 | GitHub Search API | 每周增量更新 | P0 | ✅ v1.1（Top 20-30 经典高星项目）|
+| GitHub 历史热门 AI 仓库（新锐榜） | 开源项目 | GitHub Search API | 每次抓取同步更新 | P0 | ✅ v1.1（近 30 天 star 增量最快）|
 | arXiv cs.AI | 论文 | 官方 RSS | 每日 | P0 | ✅ |
 | 36氪 | AI 资讯 | 官方 RSS（AI 过滤） | 每日 | P0 | ✅ |
 | 雷峰网 | AI 资讯 | 官方 RSS | 每日 | P0 | ✅ |
 | Lenny's Podcast | 播客 | Substack RSS | 每周数期 | P1 | ✅ |
 | 硅谷101 | 播客 | Fireside RSS | 每周 | P1 | ✅ |
 | 管理员爆料 | 人工录入 | 管理员表单 | 不定期 | P1 | ✅ |
+| Product Hunt | AI 工具 | RSS 2.0（AI 关键词过滤） | 每日 | P0 | ✅ v1.1 |
+| Hacker News | 技术社区 | Atom feed | 实时 | P0 | ✅ v1.1 |
+| OpenAI Blog | 官方博客 | RSS | 不定期 | P0 | ✅ v1.1 |
+| Google AI Blog | 官方博客 | Atom | 不定期 | P0 | ✅ v1.1 |
+| Hugging Face Blog | 官方博客 | RSS | 不定期 | P0 | ✅ v1.1 |
 | 机器之心 | AI 资讯 | 官方 RSS | 每小时 | P0 | ❌ 已禁用（源不稳定） |
 
 ## 部署架构
@@ -143,6 +155,20 @@ Render 免费版 15 分钟无流量休眠（冷启动约 30s）。UptimeRobot �
 
 ---
 
+## V1.1 变更记录（自 V1.0 以来）
+
+| 变更 | 类型 | 说明 |
+|------|------|------|
+| 英文内容翻译 | 功能 | 百度翻译 API，异步队列，CJK > 15% 跳过 |
+| GitHub 历史热门 AI 仓库 | 功能 | 常青榜（周增量）+ 新锐榜（每次抓取同步），长青榜封顶 70°C |
+| 爆料编辑/预览/验证 | 管理 | PATCH API + 实时预览 + 前端校验 |
+| 新增 RSS 数据源 | 数据 | Product Hunt、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog |
+| 置顶机制 | 功能 | 置顶/取消置顶 + 热度衰减 + 红色角标 |
+| 热度评分平衡 | 优化 | GitHub 星数降 5 分，加分收窄 5→3，base 微调 |
+| AI 内容过滤增强 | 优化 | HN 新增 AI 过滤，统一 \b 边界正则，HN 空摘要清理 |
+| 36氪数据清理 | 运维 | 数据库清除 139 条非 AI 财经噪音 |
+| 排序策略 | 变更 | ORDER BY 增加 is_pinned / pinned_at 作为 tiebreaker |
+
 ## 风险与约束
 
 1. **RSS 源变更**：上游 RSS 格式变更或限流 → 记录日志，尝试备用地址
@@ -150,6 +176,9 @@ Render 免费版 15 分钟无流量休眠（冷启动约 30s）。UptimeRobot �
 3. **GitHub Trending HTML 结构**：页面改版可能导致 Scraper 失效
 4. **数据新鲜度**：连续上榜仓库的 published_at 停滞 → ON CONFLICT 更新已修复
 5. **版权合规**：仅展示标题与摘要（< 200 字），点击新窗口跳转原文
+6. **翻译 API 限流**：百度翻译 API 免费版有字符上限 → 异步队列重试机制 + CJK 阈值过滤（>15%跳过）减少无效调用
+7. **GitHub Search API 限流**：未认证仅 60 次/小时 → 需配置 GITHUB_TOKEN 认证后 5000 次/小时
+8. **Product Hunt 内容噪声**：RSS 包含非 AI 品类 → AI 关键词白名单过滤
 
 ---
 
@@ -167,3 +196,21 @@ Render 免费版 15 分钟无流量休眠（冷启动约 30s）。UptimeRobot �
 | 8 | 自定义域名可访问 | ✅ `https://sr.miko-ai.cn/` |
 | 9 | 保活运行服务持续在线 | ✅ UptimeRobot |
 | 10 | 数据新鲜度正确 | ✅ published_at 随抓取更新 |
+
+## 成功标准（V1.1）
+
+| # | 标准 | 状态 |
+|---|------|------|
+| 1 | 非中文标题/摘要自动翻译为中文，异步队列不阻塞主流程 | ✅ |
+| 2 | CJK > 15% 的中英混写文本不触发翻译，≤ 15% 正确翻译 | ✅ |
+| 3 | 百度翻译 API 失败时保留原文，异步队列重试 | ✅ |
+| 4 | 常青榜 Top 20-30 高星 AI 仓库入库，与新锐榜分区展示 | ✅ 长青榜封顶 70°C |
+| 5 | 新锐榜展示近 30 天 star 增量最快的 AI 项目 | ✅ |
+| 6 | GITHUB_TOKEN 配置后 API 限流 5000 次/小时正常工作 | ✅ |
+| 7 | 管理员可编辑已发布爆料（PATCH API），标签全量覆盖 | ✅ |
+| 8 | 编辑表单提交前实时预览，必填字段实时校验 | ✅ |
+| 9 | Product Hunt / Hacker News / OpenAI / Google AI / HuggingFace 新源正常抓取 | ✅ |
+| 10 | Product Hunt 非 AI 内容被白名单过滤，不稀释工具榜 | ✅ |
+| 11 | 管理员置顶文章热度衰减（99→95→90→85→普通），72h 后自动降级 | ✅ |
+| 12 | 热度评分平衡：GitHub 星数降 5 分，加分收窄 5→3，首页覆盖 6+ 数据源 | ✅ |
+| 13 | Hacker News AI 过滤 + 空摘要处理 + `\b` 边界正则统一 | ✅ |

@@ -12,7 +12,16 @@ INSERT INTO sources (name, slug, feed_url, category, update_interval, fallback_u
   ('雷峰网', 'leiphone', 'https://www.leiphone.com/feed', 'news', 'daily', '[]', true),
   ('Lenny''s Podcast', 'lennys_podcast', 'https://www.lennysnewsletter.com/feed', 'podcast', 'weekly', '[]', true),
   ('硅谷101', 'sv101', 'https://sv101.fireside.fm/rss', 'podcast', 'weekly', '[]', true),
-  ('管理员爆料', 'admin_post', '', 'news', 'daily', '[]', true)
+  ('管理员爆料', 'admin_post', '', 'news', 'daily', '[]', true),
+  -- V1.1: 新增数据源
+  ('Product Hunt', 'product_hunt', 'https://www.producthunt.com/feed', 'opensource', 'daily', '[]', true),
+  ('Hacker News', 'hacker_news', 'https://news.ycombinator.com/rss', 'news', 'daily', '[]', true),
+  ('OpenAI Blog', 'openai_blog', 'https://openai.com/blog/rss.xml', 'news', 'daily', '[]', true),
+  ('Google AI Blog', 'google_ai_blog', 'https://blog.google/technology/ai/rss', 'news', 'daily', '[]', true),
+  ('Hugging Face Blog', 'huggingface_blog', 'https://huggingface.co/blog/feed.xml', 'news', 'daily', '[]', true),
+  -- V1.1: GitHub 历史仓库
+  ('GitHub 历史仓库（常青榜）', 'github_evergreen', '', 'opensource', 'weekly', '[]', true),
+  ('GitHub 历史仓库（新锐榜）', 'github_rising', '', 'opensource', 'daily', '[]', true)
 ON CONFLICT (slug) DO NOTHING;
 
 -- 标签关键词词库

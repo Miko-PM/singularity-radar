@@ -6,6 +6,8 @@ import { runSchema, runSeed } from './db/index.js';
 import { loadKeywords } from './services/tagger.js';
 import { fetchAll } from './services/fetcher.js';
 import { generateHotTopics } from './services/hotTopics.js';
+import { runTranslationQueue } from './services/translator.js';
+import { fetchEvergreenRepos } from './services/gitHubHistory.js';
 import articlesRouter from './routes/articles.js';
 import tagsRouter from './routes/tags.js';
 import hotTopicsRouter from './routes/hotTopics.js';
@@ -53,18 +55,45 @@ async function start() {
       console.log('[Cron] Scheduled fetch started...');
       try {
         await fetchAll();
+        // V1.1: 抓取完成后异步执行翻译
+        runTranslationQueue();
       } catch (err) {
         console.error('[Cron] Fetch error:', err);
       }
     });
     console.log('[Server] Cron scheduled: 8:00, 12:00, 18:00, 22:00 UTC+8');
 
+    // V1.1: 常青榜每周一 8:00 UTC+8 更新
+    const evergreenCron = cron.schedule('0 0 * * 1', async () => {
+      console.log('[Cron] Weekly evergreen repos fetch...');
+      try {
+        await fetchEvergreenRepos();
+      } catch (err) {
+        console.error('[Cron] Evergreen error:', err);
+      }
+    });
+    console.log('[Server] Evergreen cron scheduled: Monday 8:00 UTC+8');
+
+    // V1.1: 翻译队列定时扫描（每 10 分钟）
+    const translateCron = cron.schedule('*/10 * * * *', async () => {
+      runTranslationQueue();
+    });
+    console.log('[Server] Translation cron scheduled: every 10 min');
+
     // 先启动服务器接受请求，再异步触发首次抓取（避免阻塞 Render 健康检查）
     server = app.listen(PORT, () => {
       console.log(`[Server] Running on http://localhost:${PORT}`);
-      // 首次抓取异步执行，不阻塞启动
-      fetchAll()
-        .then(() => console.log('[Server] Initial fetch complete'))
+      // 首次抓取：常青榜先于 Rising（避免 Rising 抢先占用 URL）
+      fetchEvergreenRepos()
+        .then(() => {
+          console.log('[Server] Initial evergreen fetch complete');
+          return fetchAll();
+        })
+        .then(() => {
+          console.log('[Server] Initial fetch complete');
+          // V1.1: 首次抓取后异步执行翻译
+          runTranslationQueue();
+        })
         .catch(err => console.error('[Server] Initial fetch error (non-fatal):', err));
     });
   } catch (err) {

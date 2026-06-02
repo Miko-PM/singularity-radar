@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db/index.js';
 import { Article } from '../types/index.js';
-import { calculateHeatScore, getHoursAgo, reheatAll } from '../services/heatScore.js';
+import { calculateHeatScore, getHoursAgo, reheatAll, scoreArticle } from '../services/heatScore.js';
 import { tagArticle, retagAllArticles } from '../services/tagger.js';
 import { fetchAll } from '../services/fetcher.js';
 import { generateHotTopics } from '../services/hotTopics.js';
@@ -18,6 +18,95 @@ function requireAdmin(req: Request, res: Response): boolean {
   }
   return true;
 }
+
+// PATCH /api/admin/articles/:id — 管理员编辑爆料（v1.1）
+router.patch('/articles/:id', async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (isNaN(id)) {
+      res.status(400).json({ data: null, error: 'invalid id' });
+      return;
+    }
+
+    const existing = await query<Article>('SELECT id FROM articles WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ data: null, error: 'not found' });
+      return;
+    }
+
+    const { title, url, summary, tags, image_url, is_pinned } = req.body;
+    const setClauses: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (title !== undefined) {
+      setClauses.push(`title = $${idx++}`);
+      params.push(title);
+      // 标题更新 → 清除旧翻译，让翻译队列重译
+      setClauses.push(`title_zh = ''`);
+    }
+    if (url !== undefined) {
+      const conflict = await query<{ id: number }>('SELECT id FROM articles WHERE url = $1 AND id != $2', [url, id]);
+      if (conflict.rows.length > 0) {
+        res.status(409).json({ data: null, error: 'url conflict' });
+        return;
+      }
+      setClauses.push(`url = $${idx++}`);
+      params.push(url);
+    }
+    if (summary !== undefined) {
+      setClauses.push(`summary = $${idx++}`);
+      params.push(summary);
+      // 摘要更新 → 清除旧翻译，让翻译队列重译
+      setClauses.push(`summary_zh = ''`);
+    }
+    if (image_url !== undefined) {
+      setClauses.push(`image_url = $${idx++}`);
+      params.push(image_url);
+    }
+    if (is_pinned !== undefined) {
+      setClauses.push(`is_pinned = $${idx++}`);
+      params.push(is_pinned === true);
+      setClauses.push(`pinned_at = $${idx++}`);
+      params.push(is_pinned === true ? new Date().toISOString() : null);
+    }
+
+    if (setClauses.length > 0) {
+      params.push(id);
+      await query(`UPDATE articles SET ${setClauses.join(', ')} WHERE id = $${idx}`, params);
+    }
+
+    // 置顶切换后重算热度
+    if (is_pinned !== undefined) {
+      const articleRes = await query<Article>('SELECT * FROM articles WHERE id = $1', [id]);
+      if (articleRes.rows.length > 0) {
+        await scoreArticle(articleRes.rows[0]);
+      }
+    }
+
+    // 标签全量覆盖
+    if (tags !== undefined) {
+      await query('DELETE FROM article_tags WHERE article_id = $1', [id]);
+      const tagList = typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()) : tags;
+      for (const tagName of tagList) {
+        if (!tagName) continue;
+        await query(`INSERT INTO tags (name) VALUES ($1) ON CONFLICT DO NOTHING`, [tagName]);
+        const tagRes = await query<{ id: number }>(`SELECT id FROM tags WHERE name = $1`, [tagName]);
+        if (tagRes.rows.length > 0) {
+          await query(`INSERT INTO article_tags (article_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [id, tagRes.rows[0].id]);
+        }
+      }
+    }
+
+    await generateHotTopics();
+    res.json({ data: { id }, error: null });
+  } catch (err: any) {
+    console.error('[API] PATCH /admin/articles/:id error:', err.message);
+    res.status(500).json({ data: null, error: 'internal error' });
+  }
+});
 
 // POST /api/admin/articles — 管理员录入爆料
 router.post('/articles', async (req: Request, res: Response) => {

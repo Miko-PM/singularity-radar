@@ -16,6 +16,8 @@ export interface Article {
   title: string;
   url: string;
   summary: string;
+  title_zh: string;
+  summary_zh: string;
   author: string;
   published_at: string;
   image_url: string;
@@ -24,6 +26,8 @@ export interface Article {
   views_count: number;
   is_admin_post: boolean;
   is_featured: boolean;
+  is_pinned: boolean;
+  pinned_at: string | null;
   created_at: string;
   tags?: string[];
   source_name?: string;

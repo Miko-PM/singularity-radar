@@ -58,8 +58,10 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(tag);
     }
 
-    // lang 筛选 — 仅中文（数据库正则不支持 CJK 范围，在 JS 层过滤）
-    // 在 JavaScript 中 /[\u4e00-\u9fff]/ 是可靠的中文检测方式
+    // lang 筛选 — 仅中文（PostgreSQL CJK Unicode 范围正则）
+    if (lang === 'zh') {
+      where += ` AND (a.title ~ '[\u4e00-\u9fff]' OR a.summary ~ '[\u4e00-\u9fff]' OR a.title_zh ~ '[\u4e00-\u9fff]' OR a.summary_zh ~ '[\u4e00-\u9fff]')`;
+    }
 
     // days 筛选 — 限制最近 N 天
     if (days) {
@@ -73,8 +75,8 @@ router.get('/', async (req: Request, res: Response) => {
     // filter 排序
     let orderBy = 'ORDER BY a.published_at DESC';
     if (filter === 'hot') {
-      where += ` AND a.published_at > NOW() - INTERVAL '3 days'`;
-      orderBy = 'ORDER BY a.hot_score DESC, a.published_at DESC';
+      // 置顶仅作为同分 tiebreaker，不强制置顶在最前（热度衰减后自然降序）
+      orderBy = 'ORDER BY a.hot_score DESC, a.is_pinned DESC, a.pinned_at DESC NULLS LAST, a.published_at DESC';
     } else if (filter === 'featured') {
       where += ` AND a.is_featured = true`;
     }
@@ -112,18 +114,16 @@ router.get('/', async (req: Request, res: Response) => {
       if (!tagMap.has(row.article_id)) tagMap.set(row.article_id, []);
       tagMap.get(row.article_id)!.push(row.name);
     }
+
     let articles = dataRes.rows.map(a => ({
       ...a,
       tags: tagMap.get(a.id) || [],
+      // V1.1: 有翻译时优先展示翻译版
+      title: a.title_zh || a.title,
+      summary: a.summary_zh || a.summary,
     }));
 
-    // lang=zh 应用层过滤（PostgreSQL POSIX 正则不支持 CJK Unicode 范围）
-    if (lang === 'zh') {
-      const cjk = /[\u4e00-\u9fff]/;
-      articles = articles.filter(a => cjk.test(a.title) || cjk.test(a.summary || ''));
-    }
-
-    const adjustedTotal = lang === 'zh' ? articles.length : total;
+    const adjustedTotal = total;
 
     const response: ApiResponse<typeof articles> = {
       data: articles,
@@ -170,7 +170,12 @@ router.get('/:id', async (req: Request, res: Response) => {
     );
 
     res.json({
-      data: { ...article, tags: tagRes.rows.map(t => t.name) },
+      data: {
+        ...article,
+        tags: tagRes.rows.map(t => t.name),
+        title: article.title_zh || article.title,
+        summary: article.summary_zh || article.summary,
+      },
       error: null,
     });
   } catch (err: any) {

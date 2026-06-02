@@ -39,6 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DE
 CREATE INDEX IF NOT EXISTS idx_articles_source_id ON articles(source_id);
 CREATE INDEX IF NOT EXISTS idx_articles_hot_score ON articles(hot_score DESC);
 
+-- V1.1: 英文翻译字段
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS title_zh TEXT NOT NULL DEFAULT '';
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS summary_zh TEXT NOT NULL DEFAULT '';
+
 -- 标签表
 CREATE TABLE IF NOT EXISTS tags (
   id SERIAL PRIMARY KEY,
