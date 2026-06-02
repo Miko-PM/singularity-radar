@@ -43,6 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_articles_hot_score ON articles(hot_score DESC);
 ALTER TABLE articles ADD COLUMN IF NOT EXISTS title_zh TEXT NOT NULL DEFAULT '';
 ALTER TABLE articles ADD COLUMN IF NOT EXISTS summary_zh TEXT NOT NULL DEFAULT '';
 
+-- V1.1: GitHub 仓库星数字段（常青榜/新锐榜/趋势榜）
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS stars INTEGER DEFAULT 0;
+
 -- 标签表
 CREATE TABLE IF NOT EXISTS tags (
   id SERIAL PRIMARY KEY,
