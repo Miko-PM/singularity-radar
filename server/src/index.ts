@@ -50,7 +50,7 @@ async function start() {
     console.log('[Server] Loading tag keywords...');
     await loadKeywords();
 
-    // 定时任务：UTC+8 8:00, 12:00, 18:00, 22:00
+    // 定时任务：UTC+8 8:00, 12:00, 18:00, 22:00（cron 使用 UTC：0,4,10,14 UTC = 8,12,18,22 UTC+8）
     const cronTask = cron.schedule('0 0,4,10,14 * * *', async () => {
       console.log('[Cron] Scheduled fetch started...');
       try {
@@ -63,7 +63,7 @@ async function start() {
     });
     console.log('[Server] Cron scheduled: 8:00, 12:00, 18:00, 22:00 UTC+8');
 
-    // V1.1: 常青榜每周一 8:00 UTC+8 更新
+    // V1.1: 常青榜每周一 8:00 UTC+8（cron 使用 UTC：0 0 = 周一 0:00 UTC = 8:00 UTC+8）
     const evergreenCron = cron.schedule('0 0 * * 1', async () => {
       console.log('[Cron] Weekly evergreen repos fetch...');
       try {
