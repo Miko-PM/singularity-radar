@@ -145,9 +145,35 @@ export default function AdminPage({ onBack }: Props) {
   }
 
   // ── Auth ──
-  function handleLogin() {
+  async function handleLogin() {
     if (locked) return;
     if (token.length < 4) return;
+    // 先调后端验证 Token
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 403) {
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        if (newAttempts >= 3) {
+          setLocked(true);
+          setResult('认证失败 3 次，请刷新页面重试');
+        } else {
+          setResult(`Token 错误（${newAttempts}/3）`);
+        }
+        return;
+      }
+      const json = await res.json();
+      if (!json.data) {
+        setResult('验证失败：未知错误');
+        return;
+      }
+    } catch (err: any) {
+      setResult(`网络错误：${err.message}`);
+      return;
+    }
+    setResult(null);
     setToken(token);
     setAuthenticated(true);
     setAttempts(0);
@@ -324,6 +350,11 @@ export default function AdminPage({ onBack }: Props) {
             className="w-full mt-3 py-2.5 bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] rounded-lg text-sm font-label hover:bg-[var(--gold-bg)]/15 transition-colors disabled:opacity-40">
             确认
           </button>
+          {result && (
+            <div className="mt-3 p-3 rounded-lg bg-red-900/20 border border-red-500/30 text-red-300 text-xs font-label">
+              {result}
+            </div>
+          )}
         </div>
       </div>
     );

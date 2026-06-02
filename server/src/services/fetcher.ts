@@ -300,8 +300,9 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
       }
 
       // Hacker News AI 内容过滤（仅保留 AI 相关帖子）
+      // 使用精确关键词组合，剔除泛词（intelligence/autonomous/vision/analytics 等易误匹配）
       if (source.slug === 'hacker_news') {
-        const hnAiKeywords = /(?<!\.)\bAI\b(?!\.)|artificial intelligence|machine learning|LLM|GPT|chatbot|copilot|automation|deep learning|neural|computer vision|NLP|recommendation|predictive|analytics|data science|natural language|transformer|diffusion|embedding|vector|\bRAG\b|agent|pipeline|fine.?tun|rlhf|synthetic|autonomous|vision|speech|text.?to.?|generat|intelligence|openai|anthropic|google.*(?<!\.)\bAI\b(?!\.)|meta.*(?<!\.)\bAI\b(?!\.)|claude|gemini|llama|mistral|chatgpt|codex|groq|sora|midjourney|stability|hugging.?face|gradient|backprop|attention|token|prompt|model.*weight|inference|GPU|H100|A100|CUDA|PyTorch|TensorFlow|JAX|vector.*db|augmented.*generation|knowledge.*graph|semantic.*search|neural.*net|deep.*learning|reinforcement.*learning|supervised|unsupervised|GAN|diffusion.*model|foundation.*model|frontier.*model|caption|object.*detection|image.*generation|text.*generation|code.*generation|self.?driving|robotics|\bchip\b|semiconductor|processor|compute.*infra|data.*center|training.*run|inference.*cost/i;
+        const hnAiKeywords = /(?<!\.)\bAI\b(?!\.)|\bLLM\b|\bGPT\b|\bClaude\b|\bChatGPT\b|\bOpenAI\b|\bAnthropic\b|\bGemini\b|\bLlama\b|\bMistral\b|machine learning|deep learning|neural network|natural language|large language model|reinforcement learning|diffusion model|foundation model|frontier model|transformer|attention|backprop|\bRAG\b|agent|fine.?tun|\bRLHF\b|embedding|token|prompt|inference|synthetic.?data|copilot|codex|open source|self.?driving|autonomous|robotics|humanoid|\bGPU\b|\bCUDA\b|\bH100\b|\bA100\b|PyTorch|TensorFlow|\bJAX\b|Hugging.?Face|OpenAI|Anthropic|Google.*AI|Meta.*AI|Sora|Midjourney|Stable.?Diffusion|\bGAN\b|computer vision|object.?detection|image.?generation|text.?generation|code.?generation|speech.?recognition|text.?to.?speech|vector.*db|knowledge.*graph|semantic.*search|data.?center|compute|inference.*cost/i;
         const combined = `${title} ${summary}`;
         if (!hnAiKeywords.test(combined)) {
           continue; // 跳过非 AI 内容
@@ -323,6 +324,11 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
         if (source.slug === '36kr') catForScore = '36kr';
         if (source.slug === 'sv101') catForScore = 'sv101';
         if (source.slug === 'admin_post') catForScore = 'admin';
+        if (source.slug === 'product_hunt') catForScore = 'product_hunt';
+        if (source.slug === 'hacker_news') catForScore = 'hacker_news';
+        if (source.slug === 'openai_blog') catForScore = 'openai_blog';
+        if (source.slug === 'google_ai_blog') catForScore = 'google_ai_blog';
+        if (source.slug === 'huggingface_blog') catForScore = 'huggingface_blog';
 
         const pubDateObj = pubDate ? new Date(pubDate) : new Date();
         const hoursAgo = getHoursAgo(pubDateObj.toISOString());
@@ -355,13 +361,6 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
           // 打标签
           const tagText = `${title} ${summary}`;
           await tagArticle(result.rows[0].id, tagText);
-
-          // ≥3 标签 → 热度 +5
-          const tagCountRes = await query(`SELECT COUNT(*) AS cnt FROM article_tags WHERE article_id = $1`, [result.rows[0].id]);
-          const tagCount = parseInt(tagCountRes.rows[0]?.cnt || '0', 10);
-          if (tagCount >= 3) {
-            await query(`UPDATE articles SET hot_score = LEAST(hot_score + 5, 100) WHERE id = $1`, [result.rows[0].id]);
-          }
           newCount++;
         }
       } catch (err: any) {
