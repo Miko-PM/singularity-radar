@@ -97,6 +97,10 @@ async function start() {
         })
         .then(() => {
           console.log('[Server] Initial fetch complete');
+          // 启动时执行置顶衰减，确保旧置顶贴热度正确
+          return decayPinnedPosts();
+        })
+        .then(() => {
           // V1.1: 首次抓取后异步执行翻译
           runTranslationQueue();
         })
