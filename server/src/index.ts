@@ -5,6 +5,7 @@ import cron from 'node-cron';
 import { runSchema, runSeed } from './db/index.js';
 import { loadKeywords } from './services/tagger.js';
 import { fetchAll } from './services/fetcher.js';
+import { decayPinnedPosts } from './services/heatScore.js';
 import { generateHotTopics } from './services/hotTopics.js';
 import { runTranslationQueue } from './services/translator.js';
 import { fetchEvergreenRepos } from './services/gitHubHistory.js';
@@ -38,6 +39,9 @@ app.use('/api/admin', adminRouter);
 // 注：前端由 Vercel 独立部署，后端仅提供 API
 
 let server: ReturnType<typeof app.listen>;
+let cronTask: ReturnType<typeof cron.schedule> | null = null;
+let evergreenCron: ReturnType<typeof cron.schedule> | null = null;
+let translateCron: ReturnType<typeof cron.schedule> | null = null;
 
 // 启动
 async function start() {
@@ -51,10 +55,12 @@ async function start() {
     await loadKeywords();
 
     // 定时任务：UTC+8 8:00, 12:00, 18:00, 22:00（cron 使用 UTC：0,4,10,14 UTC = 8,12,18,22 UTC+8）
-    const cronTask = cron.schedule('0 0,4,10,14 * * *', async () => {
+    cronTask = cron.schedule('0 0,4,10,14 * * *', async () => {
       console.log('[Cron] Scheduled fetch started...');
       try {
         await fetchAll();
+        // 置顶爆料热度衰减
+        await decayPinnedPosts();
         // V1.1: 抓取完成后异步执行翻译
         runTranslationQueue();
       } catch (err) {
@@ -64,7 +70,7 @@ async function start() {
     console.log('[Server] Cron scheduled: 8:00, 12:00, 18:00, 22:00 UTC+8');
 
     // V1.1: 常青榜每周一 8:00 UTC+8（cron 使用 UTC：0 0 = 周一 0:00 UTC = 8:00 UTC+8）
-    const evergreenCron = cron.schedule('0 0 * * 1', async () => {
+    evergreenCron = cron.schedule('0 0 * * 1', async () => {
       console.log('[Cron] Weekly evergreen repos fetch...');
       try {
         await fetchEvergreenRepos();
@@ -75,7 +81,7 @@ async function start() {
     console.log('[Server] Evergreen cron scheduled: Monday 8:00 UTC+8');
 
     // V1.1: 翻译队列定时扫描（每 10 分钟）
-    const translateCron = cron.schedule('*/10 * * * *', async () => {
+    translateCron = cron.schedule('*/10 * * * *', async () => {
       runTranslationQueue();
     });
     console.log('[Server] Translation cron scheduled: every 10 min');
@@ -104,6 +110,12 @@ async function start() {
 
 function gracefulShutdown(signal: string) {
   console.log(`[Server] ${signal} received, shutting down gracefully...`);
+
+  // 停止定时任务
+  cronTask?.stop();
+  evergreenCron?.stop();
+  translateCron?.stop();
+
   if (server) {
     server.close(() => {
       console.log('[Server] HTTP server closed');

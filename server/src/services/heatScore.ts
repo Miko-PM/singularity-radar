@@ -161,6 +161,15 @@ export async function reheatAll(): Promise<number> {
     `SELECT a.*, s.slug, s.category FROM articles a JOIN sources s ON a.source_id = s.id`
   );
 
+  // 批量查标签数，避免 N+1
+  const tagCounts = new Map<number, number>();
+  const tagRes = await query<{ article_id: string; cnt: string }>(
+    `SELECT article_id, COUNT(*) AS cnt FROM article_tags GROUP BY article_id`
+  );
+  for (const row of tagRes.rows) {
+    tagCounts.set(parseInt(row.article_id), parseInt(row.cnt));
+  }
+
   let count = 0;
   for (const article of articles.rows) {
     const sourceSlug = (article as any).slug;
@@ -179,8 +188,7 @@ export async function reheatAll(): Promise<number> {
     if (sourceSlug === 'huggingface_blog') catForScore = 'huggingface_blog';
 
     const hasImage = !!article.image_url;
-    const tagRes = await query(`SELECT COUNT(*) AS cnt FROM article_tags WHERE article_id = $1`, [article.id]);
-    const tagCount = parseInt(tagRes.rows[0]?.cnt || '0', 10);
+    const tagCount = tagCounts.get(article.id) ?? 0;
 
     const isPinned = (article as any).is_pinned === true;
     const pinnedAt = (article as any).pinned_at;
@@ -194,4 +202,20 @@ export async function reheatAll(): Promise<number> {
 
   console.log(`[Heat] Rescored ${count} articles`);
   return count;
+}
+
+/** 定时衰减置顶管理员爆料的热度 */
+export async function decayPinnedPosts(): Promise<number> {
+  const res = await query<Article>(
+    `SELECT a.* FROM articles a
+     JOIN sources s ON a.source_id = s.id
+     WHERE s.slug = 'admin_post' AND a.is_pinned = true`
+  );
+  for (const article of res.rows) {
+    await scoreArticle(article);
+  }
+  if (res.rows.length > 0) {
+    console.log(`[Heat] Decayed ${res.rows.length} pinned posts`);
+  }
+  return res.rows.length;
 }

@@ -50,6 +50,9 @@ Singularity Radar 正式上线。AI 资讯聚合平台，覆盖 GitHub Trending�
   - `is_pinned` / `pinned_at` 置顶字段
 - 环境变量新增 `BAIDU_TRANSLATE_APPID`、`BAIDU_TRANSLATE_KEY`、`GITHUB_TOKEN`
 
+### 变更
+- 清理中间版本文件：删除一次性迁移脚本 `_fix_render_pg.py` 及旧版验收清单（`验收清单_20260529.xlsx`、`验收清单_20260601.xlsx`）
+
 ### 修复
 - 置顶贴热度不衰减问题：`PATCH` 置顶后触发 `scoreArticle()` 重算热度，旧置顶按时间衰减
 - 置顶贴排序问题：`ORDER BY` 增加 `is_pinned DESC, pinned_at DESC NULLS LAST` 确保置顶排在前面

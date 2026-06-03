@@ -5,6 +5,7 @@ import { calculateHeatScore, getHoursAgo, reheatAll, scoreArticle } from '../ser
 import { tagArticle, retagAllArticles } from '../services/tagger.js';
 import { fetchAll } from '../services/fetcher.js';
 import { generateHotTopics } from '../services/hotTopics.js';
+import { runTranslationQueue } from '../services/translator.js';
 
 const router = Router();
 
@@ -40,12 +41,14 @@ router.patch('/articles/:id', async (req: Request, res: Response) => {
     const setClauses: string[] = [];
     const params: any[] = [];
     let idx = 1;
+    let needsTranslate = false; // 标题/摘要修改后触发翻译队列
 
     if (title !== undefined) {
       setClauses.push(`title = $${idx++}`);
       params.push(title);
       // 标题更新 → 清除旧翻译，让翻译队列重译
       setClauses.push(`title_zh = ''`);
+      needsTranslate = true;
     }
     if (url !== undefined) {
       const conflict = await query<{ id: number }>('SELECT id FROM articles WHERE url = $1 AND id != $2', [url, id]);
@@ -61,6 +64,7 @@ router.patch('/articles/:id', async (req: Request, res: Response) => {
       params.push(summary);
       // 摘要更新 → 清除旧翻译，让翻译队列重译
       setClauses.push(`summary_zh = ''`);
+      needsTranslate = true;
     }
     if (image_url !== undefined) {
       setClauses.push(`image_url = $${idx++}`);
@@ -98,6 +102,11 @@ router.patch('/articles/:id', async (req: Request, res: Response) => {
           await query(`INSERT INTO article_tags (article_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [id, tagRes.rows[0].id]);
         }
       }
+    }
+
+    // 标题/摘要更新后立即触发翻译（异步，不阻塞响应）
+    if (needsTranslate) {
+      runTranslationQueue();
     }
 
     await generateHotTopics();

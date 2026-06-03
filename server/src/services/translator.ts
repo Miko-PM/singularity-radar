@@ -109,9 +109,11 @@ interface MonthlyUsage {
   calls: number;
 }
 
+// 用量存本地磁盘，Render 重启会重置（Ephemeral Filesystem）
+// 这意味着部署后当月配额会归零，百度 API 会返回错误码，translateBatch 会跳过
+// 权衡：每月重置一次的影响很小，不值得为此改用数据库存储
 const QUOTA_FILE = path.resolve(process.cwd(), 'data', 'translation_quota.json');
 const MAX_MONTHLY_CHARS = 850_000;  // 百度免费 1M/月，留 15% 余量
-const REFILL_MONTHLY_CHARS = 800_000; // 低于此值时触发补量翻译
 
 /** 从磁盘加载本月用量 */
 function loadMonthlyUsage(): MonthlyUsage {
@@ -162,7 +164,7 @@ function checkAndDeductQuota(texts: string[]): boolean {
   if (usage.chars + totalChars > MAX_MONTHLY_CHARS) {
     console.warn(
       `[Translator] Monthly quota exhausted (${usage.chars}/${MAX_MONTHLY_CHARS}), ` +
-      `next refill at ${REFILL_MONTHLY_CHARS} chars — will retry next month`
+      `remaining articles will retry next month`
     );
     // 注意：不标记文章已翻译，下月配额重置后会自动重试
     return false;
