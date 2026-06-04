@@ -4,6 +4,40 @@ import { Article, Tag, Source, HotTopic, ApiResponse, TabType, FilterType } from
 
 const router = Router();
 
+// ── 来源打散算法 ──
+// 在 hot 排序下，通过评分惩罚避免相同来源的文章扎堆
+function diversifyBySource<T extends { source_slug?: string; hot_score?: number }>(
+  articles: T[],
+  windowSize = 3,
+  penalty = 18
+): T[] {
+  if (articles.length <= 1) return articles;
+
+  const result: T[] = [];
+  const remaining = [...articles];
+
+  while (remaining.length > 0) {
+    const window = result.slice(-windowSize);
+    const recentSources = new Set(window.map(a => a.source_slug));
+
+    // 同源文章的有效分 = 原始分 - penalty
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const effective = recentSources.has(remaining[i].source_slug)
+        ? (remaining[i].hot_score ?? 0) - penalty
+        : (remaining[i].hot_score ?? 0);
+      if (effective > bestScore) {
+        bestScore = effective;
+        bestIdx = i;
+      }
+    }
+
+    result.push(remaining.splice(bestIdx, 1)[0]);
+  }
+  return result;
+}
+
 // GET /api/articles — 文章列表
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -122,6 +156,11 @@ router.get('/', async (req: Request, res: Response) => {
       title: a.title_zh || a.title,
       summary: a.summary_zh || a.summary,
     }));
+
+    // V1.1: 来源打散 — hot 排序下通过评分惩罚避免同源扎堆
+    if (filter === 'hot') {
+      articles = diversifyBySource(articles, 3, 18);
+    }
 
     const adjustedTotal = total;
 

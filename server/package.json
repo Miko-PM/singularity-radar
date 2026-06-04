@@ -20,7 +20,8 @@
     "express": "^4.21.2",
     "fast-xml-parser": "^5.0.8",
     "node-cron": "^3.0.3",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "tencentcloud-sdk-nodejs-tmt": "^4.1.207"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

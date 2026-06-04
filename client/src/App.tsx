@@ -7,10 +7,15 @@ import AdminPage from './pages/AdminPage.tsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('hot');
-  const [activeFilter, setActiveFilter] = useState<string>('hot');
+  const [activeFilter, setActiveFilter] = useState<string>(() => {
+    return localStorage.getItem('activeFilter') || 'latest';
+  });
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [activeSource, setActiveSource] = useState<string>('');
-  const [chineseOnly, setChineseOnly] = useState(true);
+  const [chineseOnly, setChineseOnly] = useState(() => {
+    const saved = localStorage.getItem('chineseOnly');
+    return saved !== null ? saved === 'true' : false;
+  });
   const [showAdmin, setShowAdmin] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -31,6 +36,14 @@ export default function App() {
       document.documentElement.style.color = '#ececeb';
     }
   }, [theme]);
+
+  // 持久化偏好：中文筛选 + 排序方式
+  useEffect(() => {
+    localStorage.setItem('chineseOnly', String(chineseOnly));
+  }, [chineseOnly]);
+  useEffect(() => {
+    localStorage.setItem('activeFilter', activeFilter);
+  }, [activeFilter]);
 
   // Fetch sources & tags for sidebar
   const [sources, setSources] = useState<any[]>([]);
