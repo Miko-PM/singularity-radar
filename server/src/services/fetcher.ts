@@ -162,7 +162,7 @@ async function fetchGitHubTrending(source: Source): Promise<FetchResult> {
 
       // 热度评分
       const hoursAgo = 0; // trending = 最新
-      const hotScore = calculateHeatScore('opensource', stars, hoursAgo, false, undefined);
+      const hotScore = calculateHeatScore('opensource', stars, hoursAgo, false, undefined, false, undefined, todayStars);
 
       try {
         const result = await query<Article>(
@@ -170,7 +170,6 @@ async function fetchGitHubTrending(source: Source): Promise<FetchResult> {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT (url) DO UPDATE SET
              hot_score = EXCLUDED.hot_score,
-             published_at = EXCLUDED.published_at,
              image_url = CASE WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url ELSE articles.image_url END,
              summary = CASE WHEN articles.summary = '' THEN EXCLUDED.summary ELSE articles.summary END
            RETURNING id`,
@@ -341,7 +340,6 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT (url) DO UPDATE SET
              hot_score = EXCLUDED.hot_score,
-             published_at = EXCLUDED.published_at,
              image_url = CASE WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url ELSE articles.image_url END,
              summary = CASE WHEN articles.summary = '' THEN EXCLUDED.summary ELSE articles.summary END
            RETURNING id`,

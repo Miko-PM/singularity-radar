@@ -18,15 +18,18 @@ import { Source, Article } from '../types/index.js';
  * - 没有归一化硬上限，允许热内容自然突破
  */
 
-/** GitHub star 分档（整体降 5 分，避免霸占首页） */
-function gitHubBase(stars?: number): number {
-  if (!stars || stars < 100) return 20;
-  if (stars < 500) return 30;
-  if (stars < 2000) return 40;
-  if (stars < 10000) return 45;
-  if (stars < 50000) return 50;
-  if (stars < 100000) return 55;
-  return 60; // ≥100000★
+/** GitHub star 分档（含今日新增加成） */
+function gitHubBase(stars?: number, todayStars?: number): number {
+  const todayBonus = todayStars ? Math.min(todayStars / 10, 15) : 0;
+  let base: number;
+  if (!stars || stars < 100) base = 35;
+  else if (stars < 500) base = 42;
+  else if (stars < 2000) base = 50;
+  else if (stars < 10000) base = 55;
+  else if (stars < 50000) base = 60;
+  else if (stars < 100000) base = 65;
+  else base = 70; // ≥100000★
+  return base + todayBonus;
 }
 
 export function calculateHeatScore(
@@ -36,7 +39,8 @@ export function calculateHeatScore(
   hasImage?: boolean,
   tagCount?: number,
   isPinned?: boolean,
-  pinnedAt?: string
+  pinnedAt?: string,
+  todayStars?: number
 ): number {
   // 管理员置顶衰减：99°C → 逐渐降至正常评分，72h 后走普通公式
   if (category === 'admin' && isPinned && pinnedAt) {
@@ -52,7 +56,7 @@ export function calculateHeatScore(
   let base: number;
   switch (category) {
     case 'opensource':
-      base = gitHubBase(stars);
+      base = gitHubBase(stars, todayStars);
       break;
     case 'paper':
       base = 40;
