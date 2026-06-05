@@ -5,8 +5,9 @@
 | 版本 | 日期 | 作者 | 变更内容 | 状态 | 评审人 | 评审完成时间 |
 |------|------|------|---------|------|------|------------|
 | v0.1 | 2026-05-27 | Claude | 初稿 | 已归档 | miko | 2026-05-29 |
-| v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | 已发布 | miko | 2026-06-01 |
+| v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | **已发布** | miko | 2026-06-01 |
 | v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源、热度评分平衡调整、置顶衰减 | **已发布** | miko | 2026-06-02 |
+| v1.1.1 | 2026-06-04 | Claude | 翻译引擎切换腾讯TMT、分级翻译策略、数据源打散排序、前端默认排序调整、GitHub Trending 发布时间修复、热度评分上调（含今日星数加成） | **已发布** | miko | 2026-06-04 |
 
 ---
 
@@ -15,13 +16,16 @@
 >
 > | # | 功能 | 优先级 | 所在章节 |
 > |---|------|--------|---------|
-> | 1 | **英文内容自动翻译**：百度翻译 API，异步队列批量处理。CJK > 15% 视为中文跳过，≤ 15% 自动翻译 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
+> | 1 | **英文内容翻译（腾讯TMT）**：腾讯云 TMT 翻译，限速 5 req/s，异步队列批量处理。分级策略：按 hot_score + 数据源决定翻译范围（标题+摘要/仅标题/跳过） | P0 | [§5.5](#55-英文内容翻译p0-v11) |
 > | 2 | **GitHub 历史热门 AI 仓库**：常青榜（Top 20-30 经典项目）+ 新锐榜（近 30 天增量最快项目），分区展示 | P0 | [§5.6](#56-github-历史热门-ai-仓库p0-v11) |
 > | 3 | **爆料编辑/预览/验证**：PATCH API + 实时卡片预览 + 前端表单校验 | P0 | [§5.7](#57-管理员爆料编辑预览p0-v11) |
 > | 4 | **新增 RSS 数据源**：Product Hunt（AI 关键词过滤）、Hacker News、OpenAI Blog、Google AI Blog、HuggingFace Blog | P0 | [§5.8](#58-新增-rss-数据源p0-v11) |
 > | 5 | **管理员置顶机制**：置顶/取消置顶 + 热度衰减（99→95→90→85→普通），"置顶"红色角标 | P0 | [§5.4](#54-管理员爆料p1) |
-> | 6 | **热度评分平衡**：GitHub 星数降 5 分、加分收窄 5→3、长青榜封顶 70°C | P0 | [§5.2.4](#524-热度评分算法) |
-> | 7 | **翻译/历史仓库/新源对应的验收标准** | — | [§10.5](#105-v11-验收) |
+> | 6 | **热度评分平衡**：GitHub 星数分档上调（floor 20→35）、今日星数加成（上限+15）、加分收窄 5→3、长青榜封顶 70°C | P0 | [§5.2.4](#524-热度评分算法) |
+> | 7 | **数据源打散排序**：penalty 算法，windowSize=3 惩罚同源文章 18 分，高热模式下生效 | P0 | [§5.2.4](#524-热度评分算法) |
+> | 8 | **翻译引擎切换腾讯TMT**：百度翻译额度耗尽后切换到腾讯云 TMT，引入 330ms 间隔限速 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
+> | 9 | **前端默认排序调整**：默认展示"最新情报"，中文筛选默认关闭，偏好 localStorage 持久化 | P0 | [§5.1.2](#512-导航侧栏内容) |
+> | 10 | **翻译/历史仓库/新源对应的验收标准** | — | [§10.5](#105-v11-验收) |
 
 ---
 
@@ -131,8 +135,9 @@ AI 行业信息爆炸，从业者面临严重的「信息过载」问题：
 - **空数据状态**：首次部署时无数据，每个卡片显示友好空状态提示
 - **移动端横竖屏切换**：布局自适应不崩溃
 - **内容过期**：缓存超过 3 天的内容自动淘汰，不展示过时信息
-- **数据新鲜度**：连续多天上榜的 GitHub 仓库 `published_at` 更新为最新抓取时间，避免显示为过时数据
-- **翻译失败**：百度翻译 API 超时或限流时，自动跳过翻译，保留原文展示，下次抓取重试
+- **数据新鲜度**：~~连续多天上榜的 GitHub 仓库 `published_at` 更新为最新抓取时间~~ → **v1.1.1 修复：不再更新 published_at**，避免排序永久置顶。仅首次入库记录发布时间
+- **翻译失败**：腾讯云 TMT API 超时或限流时，自动跳过翻译，保留原文展示，下次抓取重试
+- **翻译配额耗尽**：v1.1.1 新增字符配额管理，月度 4,500,000 字符用完即止，下月自动恢复
 
 ---
 
@@ -146,7 +151,7 @@ graph TB
         Tag[标签匹配引擎<br/>69关键词 · 正则匹配]
         Heat[热度评分引擎<br/>base × recency → 0-100°C]
         Topic[热门议题聚合<br/>48h · ≥2源类型 · ≥3篇]
-        TL[英译中引擎<br/>百度翻译 API<br/>非中文 CJK >30% 则翻译]
+        TL[英译中引擎<br/>腾讯云 TMT<br/>非中文 CJK >30% 则翻译<br/>分级策略：hot_score ≥65 全翻<br/>hot_score ≥40 仅标题<br/>hot_score <40 跳过]
     end
 
     subgraph 数据层["数据采集层"]
@@ -202,7 +207,7 @@ graph LR
         RSS[RSS Feeds<br/>arXiv/36氪/雷峰网/HN/PH]
         POD[Podcast RSS<br/>Lenny's/硅谷101]
         BLOG[Official Blogs<br/>OpenAI/Google/HuggingFace]
-        TRANS[百度翻译 API]
+        TRANS[腾讯云 TMT]
     end
 
     External --> Backend
@@ -247,7 +252,7 @@ flowchart TD
 ### 4.4 数据流说明
 
 1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共17个数据源，机器之心已禁用）
-2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 入库（不等翻译，URL 去重，重复时更新 published_at）→ 异步翻译队列（v1.1）扫描未翻译文章 → 百度翻译 → 写入 title_zh/summary_zh
+2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 入库（不等翻译，URL 去重）→ 异步翻译队列（v1.1）扫描未翻译文章 → 腾讯云 TMT 翻译（330ms 间隔限速）→ 按热度分级决定翻译范围 → 写入 title_zh/summary_zh
 3. **历史仓库**（v1.1）：首次种子数据一次性拉取 50 条高星仓库（常青榜），之后每周增量更新一次；新锐榜随每次抓取同步更新
 4. **前端渲染**：React 请求 REST API → JSON 响应（title_zh 非空时优先返回翻译版）→ 骨架屏过渡 → 卡片渲染
 5. **用户交互**：筛选/排序/Tab切换 → URL参数变化 → API重新请求 → 内容刷新
@@ -371,9 +376,13 @@ flowchart TD
 **筛选器（对当前 Tab 内容过滤）**
 | 筛选项 | 说明 |
 |--------|------|
-| 最新情报 | 按时间倒序，默认 |
-| 高热爆料 | 按热度指标排序 |
+| 最新情报 | 按时间倒序 |
+| 高热爆料 | 按热度指标排序，数据源打散（windowSize=3, penalty=18，v1.1.1 新增），**默认** |
 | 编辑精选 | 管理员标记（预留） |
+
+**用户偏好持久化**（v1.1.1）：
+- 筛选器选择（最新/高热）存入 `localStorage`，刷新/关闭后保持
+- 中文筛选开关存入 `localStorage`，默认关闭 |
 
 #### 5.1.3 卡片组件设计
 
@@ -436,8 +445,8 @@ flowchart TD
 | title | TEXT NOT NULL | 标题 |
 | url | TEXT NOT NULL UNIQUE | 原文链接（去重依据，带唯一索引） |
 | summary | TEXT | 摘要描述 |
-| **title_zh** | **TEXT NOT NULL DEFAULT ''** | **百度翻译后的中文标题（v1.1 新增）。未翻译时为空字符串，前端判断 `title_zh !== ''` 时展示翻译版。不加索引（非查询条件）** |
-| **summary_zh** | **TEXT NOT NULL DEFAULT ''** | **百度翻译后的中文摘要（v1.1 新增）。未翻译时为空字符串，前端逻辑同 title_zh** |
+| **title_zh** | **TEXT NOT NULL DEFAULT ''** | **翻译后的中文标题（v1.1 新增）。原文 CJK >15% 时直接写入 `''` 标记已处理。未翻译时为空字符串，前端判断 `title_zh !== ''` 时展示翻译版。不加索引（非查询条件）** |
+| **summary_zh** | **TEXT NOT NULL DEFAULT ''** | **翻译后的中文摘要（v1.1 新增）。前端逻辑同 title_zh** |
 | author | TEXT | 作者 |
 | published_at | TIMESTAMP | 发布时间（**加索引**，用于排序查询。ON CONFLICT 时更新为最新） |
 | image_url | TEXT | 配图 URL（可选） |
@@ -517,7 +526,8 @@ flowchart TD
        ├── 扫描 title_zh = '' 的文章
        ├── CJK 汉字 > 15% → 跳过（中文内容）
        ├── CJK 汉字 ≤ 15% → 翻译
-       │     ├── 多条标题+摘要打包（百度 API 单次最多 6000 字符）
+       │     ├── 分级策略 decideTranslationScope() 决定翻译范围
+       │     ├── 单条翻译（腾讯 TMT 不支持批量），330ms 间隔限速
        │     └── 结果写入 title_zh / summary_zh
        └── 翻译失败/超时 → 保留空，下次队列重试
 ```
@@ -526,7 +536,7 @@ flowchart TD
 - 摘要提取纯文本，strip HTML tags
 - URL 去重：以 `url` 字段为唯一约束
 - 标签匹配：标题 + 摘要 + content:encoded 前 200 字，正则 `\bkeyword\b`（不区分大小写）
-- **数据新鲜度**：ON CONFLICT 时更新 `published_at = EXCLUDED.published_at`，确保连续上榜的 GitHub 仓库时间戳保持最新
+- **数据新鲜度（v1.1.1 修复）**：~~ON CONFLICT 时更新 `published_at`~~ → 不再更新 published_at。原逻辑导致 GitHub Trending 仓库每次抓取发布时间刷新为最新，排序永久置顶。现仅首次写入时记录发布时间，UPSERT 仅更新 hot_score / image_url / summary
 
 **日志记录：**
 - 每次抓取输出 console.log：时间、源名称、结果（OK/FAIL）、新增条数、耗时
@@ -540,7 +550,10 @@ flowchart TD
 **GitHub Trending 特殊处理：**
 - 与 RSS 源不同，GitHub Trending 使用 HTML Scraper 直接解析 `github.com/trending`
 - `published_at` 设为 `new Date()`（抓取时间）而非文章原始发布时间
-- 因此 ON CONFLICT 时更新 `published_at` 对 GitHub Trending 尤为重要
+- **v1.1.1 修复**：~~ON CONFLICT 时更新 `published_at`~~ → 不再更新。原逻辑导致：
+  - GitHub Trending 仓库每次抓取都将 published_at 刷为最新，排序永久置顶
+  - 修复后仅首次插入记录发布时间，后续 UPSERT 仅更新热度/配图/摘要
+  - 同仓库连续多天在 Trending 榜上不再霸占"最新情报"首位
 
 #### 5.2.3 API 接口
 
@@ -602,13 +615,15 @@ hot_score = min(round(base × recency_boost + bonus), 100) °C
 
 base_score（数据源基础权重）:
   - GitHub Trending / 历史仓库（opensource）: 分档制
-    - ★ < 100: 20
-    - ★ < 500: 30
-    - ★ < 2000: 40
-    - ★ < 10000: 45
-    - ★ < 50000: 50
-    - ★ < 100000: 55
-    - ★ ≥ 100000: 60
+    - ★ < 100: 35（v1.1.1 上调，原 20）
+    - ★ < 500: 42（v1.1.1 上调，原 30）
+    - ★ < 2000: 50（v1.1.1 上调，原 40）
+    - ★ < 10000: 55（v1.1.1 上调，原 45）
+    - ★ < 50000: 60（v1.1.1 上调，原 50）
+    - ★ < 100000: 65（v1.1.1 上调，原 55）
+    - ★ ≥ 100000: 70（v1.1.1 上调，原 60）
+  - 今日星数加成：今日新增 star 数 × 0.1，上限 +15（v1.1.1 新增）
+    例如今日新增 150★ → base 额外 +15，合计 85
   - arXiv 论文（paper）: 40
   - 36氪（slug: 36kr）: 50
   - 雷峰网（news）: 55
@@ -646,6 +661,19 @@ bonus（额外加分）:
 - 按"高热爆料"筛选时，按 `hot_score DESC, is_pinned DESC, pinned_at DESC NULLS LAST, published_at DESC` 排序
 - 按"最新情报"筛选时，按 `published_at DESC` 排序
 - 置顶排序仅在 hot_score 相同时作为 tiebreaker 生效（衰减后自然降序）
+
+**数据源打散排序（v1.1.1 新增）：**
+- **目的**：避免热点模式下同数据源文章连续排列（如 GitHub 仓库扎堆）
+- **算法**：贪心选择 + penalty 惩罚
+  ```
+  diversifyBySource(articles, windowSize=3, penalty=18)
+  ```
+  - 遍历文章列表，维护一个长度为 `windowSize` 的滑动窗口（最近选中记录）
+  - 对每篇文章，若其数据源已在窗口中，则将有效分 = `hot_score - penalty`
+  - 每次选择有效分最高的未选文章
+  - 选中的文章进入窗口尾部，窗口满后移除头部
+- **生效范围**：仅在"高热爆料"（filter=hot）模式下生效
+- **效果**：前 25 条覆盖 6+ 不同数据源，避免单一源霸榜
 
 ### 5.3 热门议题聚合（P1）
 
@@ -715,21 +743,73 @@ bonus（额外加分）:
 
 **目标：** 非中文的标题和摘要自动翻译为中文展示，降低英文阅读门槛，用户感兴趣时跳转原文。
 
+**翻译引擎：** 腾讯云 TMT（Tencent Machine Translation）
+- 使用 `tencentcloud-sdk-nodejs-tmt` SDK
+- 支持中文 ↔ 英文互译
+- 标准版接口，按字符计费
+- API 限速：5 req/s（需实现客户端限速，见下文）
+
 **翻译判断规则（避免浪费 API 额度）：**
 
 ```
 统计文本中 CJK 汉字字符占比：
   > 15% → 视为中文内容（含英文术语的中文文本），跳过翻译
-  ≤ 15% → 视为非中文内容，调用百度翻译
+  ≤ 15% → 视为非中文内容，调用腾讯 TMT 翻译
 ```
 
 > **阈值说明：** GitHub 仓库描述如"这是一个基于 Transformer 的框架，支持 LLaMA/Qwen/DeepSeek 等模型"中 CJK 占比约 20%，阈值设为 15% 可覆盖此类中英混写文本。上线后可基于实际数据微调。
+
+**分级翻译策略（v1.1.1 新增，成本优化）：**
+
+```
+decideTranslationScope(title, summary, hotScore, sourceSlug)
+
+hotScore ≥ 65:
+  → 翻译标题 + 摘要（全文翻译）
+hotScore ≥ 40:
+  → 仅翻译标题（摘要不翻译，节省字符）
+hotScore < 40:
+  → 跳过翻译（低热度内容无需翻译）
+
+数据源覆盖规则（无视热度）：
+  - 官方博客源（openai_blog / google_ai_blog / huggingface_blog）: 翻译标题 + 摘要
+  - Hacker News: 仅翻译标题
+  - 其他源: 按 hotScore 分级规则
+```
+
+**设计理由（分级策略）：**
+- 百度翻译额度耗尽后发现每月 850K 字符远不能满足全量翻译（日均 300+ 新文章）
+- 切换腾讯 TMT 后需严格控制成本
+- 热度 ≥65 的高价值内容全翻，≥40 的至少翻译标题，<40 的暂不翻译
+- 官方博客默认全翻（内容权威性高）
+- 估算每月字符消耗：约 200K-400K 字符（取决于内容量）
+
+**API 限速（v1.1.1 新增）：**
+
+```
+腾讯 TMT 限制：5 req/s
+实现方案：共享 lastApiCallTime 变量 + 最小间隔 330ms
+
+async function rateLimitedTranslate(client, text) {
+  const now = Date.now();
+  const elapsed = now - lastApiCallTime;
+  const wait = Math.max(0, 330 - elapsed);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastApiCallTime = Date.now();
+  // ... 调用 TMT API
+}
+```
+
+**字符配额管理（v1.1.1 新增）：**
+- 每月预算上限：4,500,000 字符（腾讯云 TMT 标准版）
+- 安全阈值：低于 200 字符时停止翻译，避免超额
+- 配额持久化：`server/data/translation_quota.json`（Render 临时文件系统，重启后从 DB 重建）
 
 **特殊处理：**
 - GitHub 标题 `owner/repo` 格式（无中文、无英文句子）→ 跳过翻译
 - 摘要为空 → 跳过翻译
 - 翻译失败（超时/限流）→ 保留原文，下次抓取时重试
-- 后续 ON CONFLICT 更新时，已有翻译结果的不重复调用
+- 后续 UPSERT 更新时，已有翻译结果的不重复调用（`title_zh != ''` 跳过）
 
 **异步翻译队列（不阻塞主抓取流程）：**
 
@@ -738,8 +818,10 @@ bonus（额外加分）:
                                             ↓
               异步 translator 扫描 title_zh IS NULL 的文章
                                             ↓
-              批量调百度翻译 API（单次最多 6000 字符，
-              多条标题/摘要打包一次请求）
+              分级判断 decideTranslationScope()
+              ├── 跳过：UPDATE title_zh = ''（标记已处理）
+              ├── 仅标题：调 TMT 翻译标题
+              └── 全翻：调 TMT 翻译标题 + 摘要
                                             ↓
               更新 title_zh / summary_zh
                                             ↓
@@ -747,12 +829,14 @@ bonus（额外加分）:
 ```
 
 **设计理由：**
-- 避免串行等待百度 API 返回（每条 1-2s），防止抓取流程整体变慢
-- 百度翻译 API 支持批量翻译，单次最多 6000 字符，可将多条文章打包一次请求
+- 避免串行等待翻译 API 返回（每条 0.5-1s），防止抓取流程整体变慢
+- 腾讯 TMT 每次调用翻译一条文本（不支持批量打包），通过分级策略减少调用量
 - 翻译失败不影响抓取结果，下次队列重试即可
 
-**API 选择：** 百度翻译 API（标准版，免费 100 万字符/月，国内访问快）
-- 你需要做的事：在 [百度翻译开放平台](https://api.fanyi.baidu.com/) 注册，领取 `appid` + `key`，配置为环境变量 `BAIDU_TRANSLATE_APPID` 和 `BAIDU_TRANSLATE_KEY`
+**API 选择：** 腾讯云 TMT（标准版，免费 500 万字符/月，国内访问快）
+- 你需要做的事：在 [腾讯云控制台](https://console.cloud.tencent.com/) 开通 TMT 服务，创建密钥，配置为环境变量 `TENCENT_SECRET_ID`、`TENCENT_SECRET_KEY`、`TENCENT_REGION`
+
+> **版本迁移说明：** v1.1 初始使用百度翻译 API，2026-06-04 因免费额度耗尽（849,994/850,000 字符）切换到腾讯云 TMT。切换同时引入分级翻译策略以控制成本。如未来额度仍不足，可考虑升级付费套餐或进一步收紧翻译范围。
 
 ### 5.6 GitHub 历史热门 AI 仓库（P0, v1.1）
 
@@ -863,8 +947,9 @@ NLP / recommendation / predictive / analytics / data science
 | RSS 格式不兼容 | 尝试备用 RSS 地址，失败则标记为 FAIL |
 | 单卡片加载失败 | 前端 catch 错误，不阻塞列表 |
 | GitHub Trending HTML 结构变更 | 解析返回 0 条，记录日志，下次重试 |
-| **数据新鲜度**：连续多天上榜的仓库 `published_at` 过时 | ON CONFLICT 时更新 `published_at` |
-| **翻译失败**（v1.1）：百度翻译 API 超时/限流 | 跳过翻译保留原文，下次抓取重试 |
+| **数据新鲜度**：连续多天上榜的仓库 `published_at` 过时 | ~~ON CONFLICT 时更新 `published_at`~~ → **v1.1.1 修复：不再更新**，避免排序永久置顶 |
+| **翻译失败**（v1.1.1）：腾讯 TMT API 超时/限流/超配额 | 跳过翻译保留原文，下次抓取重试 |
+| **翻译超配额**（v1.1.1）：月度字符用完 | 余量 < 200 字符时停止翻译，下月自动恢复 |
 | **GitHub Search API 限流**（v1.1）：每小时 5000 次 | 失败后静默跳过，下个周期重试 |
 
 ### 6.2 API 异常
@@ -932,7 +1017,7 @@ NLP / recommendation / predictive / analytics / data science
 | Render | Render Inc. | 后端托管 | ✅ 是 | API 服务，免费版 15 分钟无流量休眠 |
 | Supabase PostgreSQL | Supabase Inc. | 数据库 | ✅ 是 | 免费版 500MB 存储，SSL 连接 |
 | UptimeRobot | UptimeRobot Inc. | 保活监控 | ✅ 是 | 每 5 分钟 ping /api/health |
-| 百度翻译 API | 百度 | 英译中 | ✅ 是（v1.1） | 标准版免费 100 万字符/月 |
+| 腾讯云 TMT | 腾讯云 | 英译中 | ✅ 是（v1.1） | 标准版免费 500 万字符/月。v1.1 初用百度翻译（免费额度 850K/月已于 2026-06-04 耗尽），后切换至腾讯 TMT。详见 §5.5 |
 | Product Hunt | Product Hunt | RSS 数据源 | ✅ 是（v1.1） | `https://www.producthunt.com/feed` |
 | Hacker News | Y Combinator | RSS 数据源 | ✅ 是（v1.1） | `https://news.ycombinator.com/rss` |
 | OpenAI Blog | OpenAI | RSS 数据源 | ❌ 否（v1.1） | `https://openai.com/blog/rss/`，更新不定期 |
@@ -1009,12 +1094,20 @@ NLP / recommendation / predictive / analytics / data science
 **翻译**
 - [x] 非中文标题/摘要自动翻译为中文，卡片展示翻译后文本
 - [x] CJK 汉字 > 15% 的中英混写文本（如"基于 Transformer 的框架，支持 LLaMA/Qwen 等模型"）不触发翻译
-- [x] CJK ≤ 15% 的纯英文文本正确调用百度翻译
+- [x] CJK ≤ 15% 的纯英文文本正确调用翻译 API
 - [x] 翻译队列异步执行，不阻塞主抓取流程
-- [x] 多条文章打包一次批量翻译请求（单次 ≤ 6000 字符）
-- [x] 百度翻译 API 失败时保留原文，异步队列下次重试
-- [x] ON CONFLICT 更新时已有翻译结果不重复调用
+- [x] 翻译 API 失败时保留原文，异步队列下次重试
+- [x] UPSERT 更新时已有翻译结果不重复调用
 - [x] 翻译结果写入 title_zh / summary_zh，前端 title_zh !== '' 时展示翻译版
+
+**翻译 — v1.1.1 变更**
+- [x] 翻译引擎从百度切换为腾讯云 TMT，SDK 集成正常
+- [x] API 限速生效：330ms 间隔，不超过 5 req/s
+- [x] 分级翻译策略生效：hotScore ≥65 翻译标题+摘要，≥40 仅标题，<40 跳过
+- [x] 官方博客源默认全翻
+- [x] Hacker News 默认仅翻译标题
+- [x] 字符配额追踪正常：translation_quota.json 持久化，余量 < 200 时停止翻译
+- [x] 每月预算 4,500,000 字符，停止后下月自动恢复
 
 **GitHub 历史热门 AI 仓库**
 - [x] 常青榜首批种子数据 Top 20-30 高星 AI 仓库入库，按 stars desc 排序
@@ -1056,6 +1149,29 @@ NLP / recommendation / predictive / analytics / data science
 - [x] 长青榜封顶 70°C（抓取 + 单篇重算 + 批量重算三路覆盖）
 - [x] 前 25 条覆盖 6+ 不同数据源，多样性达标
 
+**热度评分 v1.1.1 调整**
+- [x] gitHubBase 全面上调：floor 20→35，分档调整 30→42, 40→50, 45→55, 50→60, 55→65, 60→70
+- [x] 今日星数加成：todayStars / 10，上限 +15
+- [x] `calculateHeatScore()` 签名增加 `todayStars` 参数
+- [x] GitHub Trending 抓取时传入 todayStars，低星仓库热度明显提升（如 20★ + 50★today → 42+5=47°C）
+
+**数据源打散排序** `(v1.1.1 新增)`
+- [x] `diversifyBySource()` 算法在 filter=hot 模式生效
+- [x] windowSize=3, penalty=18 配置生效，同源 18 分惩罚
+- [x] 贪心选择确保前 25 条覆盖 6+ 不同数据源
+- [x] 最新情报模式不受影响（纯时间排序）
+
+**前端默认行为调整** `(v1.1.1 新增)`
+- [x] 默认排序为"最新情报"（原"高热爆料"）
+- [x] 中文筛选默认关闭
+- [x] 排序偏好 localStorage 持久化，刷新保持
+- [x] 中文筛选偏好 localStorage 持久化
+
+**GitHub Trending 排序修复** `(v1.1.1 修复)`
+- [x] 移除 ON CONFLICT 中的 `published_at = EXCLUDED.published_at`
+- [x] 同仓库连续多天在 Trending 榜不再霸占"最新情报"首位
+- [x] 仅首次入库记录发布时间，后续更新仅刷新热度/配图/摘要
+
 ---
 
 ## 附录
@@ -1093,7 +1209,7 @@ NLP / recommendation / predictive / analytics / data science
 
 | 变更 | 类型 | 说明 |
 |------|------|------|
-| 英文内容翻译 | 功能 | 接入百度翻译 API，非中文标题/摘要自动翻译展示，CJK >15% 跳过 |
+| 英文内容翻译 | 功能 | 接入百度翻译 API（初版），非中文标题/摘要自动翻译展示，CJK >15% 跳过 |
 | GitHub 历史热门 AI 仓库 | 功能 | GitHub Search API 双通道搜索，种子 50 条 + 每周增量更新 |
 | 爆料编辑 | 管理 | 新增 PATCH /api/admin/articles/:id，支持修改标题/摘要/标签/图片/置顶 |
 | 爆料预览 | 管理 | 管理表单实时渲染卡片预览，所见即所得 |
@@ -1103,6 +1219,20 @@ NLP / recommendation / predictive / analytics / data science
 | 热度评分平衡 | 优化 | GitHub 星数降 5 分，加分收窄 5→3，base 微调，长青榜封顶 70°C |
 | AI 内容过滤增强 | 优化 | HN 新增 AI 过滤，统一正则 \b 边界，HN 空摘要清理 |
 | 排序策略 | 优化 | ORDER BY 增加 is_pinned / pinned_at 作为 tiebreaker |
+
+#### V1.1.1（2026-06-04）
+
+| 变更 | 类型 | 说明 |
+|------|------|------|
+| 翻译引擎切换腾讯 TMT | 架构 | 百度翻译免费额度耗尽（849,994/850,000 字符），切换到腾讯云 TMT |
+| 分级翻译策略 | 优化 | 按 hotScore 分级：≥65 全翻、≥40 仅标题、<40 跳过；官方博客全翻，HN 仅标题 |
+| API 限速 | 优化 | 腾讯 TMT 限制 5 req/s，引入 shared lastApiCallTime 330ms 间隔 |
+| 字符配额管理 | 优化 | 每月 4,500,000 字符上限，余量 < 200 时停止翻译，持久化到 translation_quota.json |
+| 数据源打散排序 | 功能 | 新增 diversifyBySource() 贪心算法，windowSize=3, penalty=18，高热模式生效 |
+| GitHub Trending 发布时间修复 | Bugfix | 移除 ON CONFLICT 中 published_at 更新逻辑，避免仓库排序永久置顶 |
+| 热度评分上调 | 优化 | gitHubBase floor 20→35，分档全面上调；今日星数加成（上限 +15） |
+| 前端默认排序调整 | 优化 | 默认展示"最新情报"（原"高热爆料"），中文筛选默认关闭 |
+| 用户偏好持久化 | 优化 | 筛选器选择 + 中文开关存入 localStorage，刷新保持 |
 
 ### C. 竞品参考列表
 | 产品 | 网址 | 参考价值 |

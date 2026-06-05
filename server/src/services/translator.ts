@@ -1,7 +1,5 @@
 import { tmt } from 'tencentcloud-sdk-nodejs-tmt';
 import { query } from '../db/index.js';
-import fs from 'fs';
-import path from 'path';
 
 // ── CJK 检测 ──
 
@@ -90,7 +88,7 @@ export async function translateBatch(texts: string[]): Promise<(string | null)[]
   return texts.map(t => t.length > 0 ? (results[idx++] ?? null) : null);
 }
 
-// ── 月度翻译用量追踪（持久化到文件，防止重启丢失） ──
+// ── 月度翻译用量追踪（DB 持久化，替代本地文件，防止重启丢失） ──
 
 interface MonthlyUsage {
   month: string;   // "2026-06"
@@ -98,81 +96,89 @@ interface MonthlyUsage {
   calls: number;
 }
 
-// 用量存本地磁盘，Render 重启会重置（Ephemeral Filesystem）
-// 腾讯 API 服务端也有独立计数，本地文件仅用于提前自我限制
-const QUOTA_FILE = path.resolve(process.cwd(), 'data', 'translation_quota.json');
 const MAX_MONTHLY_CHARS = 4_500_000;  // 腾讯免费 5M/月，留 10% 余量
-const MIN_REMAINING_CHARS = 200;      // 剩余不足时提前停止，避免无意义循环
+const MIN_REMAINING_CHARS = 200;      // 剩余不足时提前停止
 
-/** 从磁盘加载本月用量 */
-function loadMonthlyUsage(): MonthlyUsage {
+// 内存缓存，避免每次翻译都查 DB
+let usageCache: MonthlyUsage | null = null;
+
+async function loadUsageFromDb(): Promise<MonthlyUsage> {
   try {
-    if (fs.existsSync(QUOTA_FILE)) {
-      const raw = fs.readFileSync(QUOTA_FILE, 'utf-8');
-      return JSON.parse(raw);
+    const res = await query<{ month: string; chars: number; calls: number }>(
+      `SELECT month, chars, calls FROM translation_usage WHERE id = 1`
+    );
+    if (res.rows.length > 0) {
+      return { month: res.rows[0].month, chars: res.rows[0].chars, calls: res.rows[0].calls };
     }
-  } catch {
-    // 文件损坏等，重置
+  } catch (err: any) {
+    console.warn(`[Translator] Failed to load quota from DB: ${err.message}`);
   }
   return { month: '', chars: 0, calls: 0 };
 }
 
-/** 保存月度用量到磁盘 */
-function saveMonthlyUsage(usage: MonthlyUsage): void {
+async function saveUsageToDb(usage: MonthlyUsage): Promise<void> {
   try {
-    const dir = path.dirname(QUOTA_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(QUOTA_FILE, JSON.stringify(usage), 'utf-8');
+    await query(
+      `UPDATE translation_usage SET month = $1, chars = $2, calls = $3, updated_at = NOW() WHERE id = 1`,
+      [usage.month, usage.chars, usage.calls]
+    );
   } catch (err: any) {
-    console.warn(`[Translator] Failed to save quota: ${err.message}`);
+    console.warn(`[Translator] Failed to save quota to DB: ${err.message}`);
   }
 }
 
-/** 获取当月已用量（懒加载） */
-function getOrInitMonthlyUsage(): MonthlyUsage {
-  const usage = loadMonthlyUsage();
-  const thisMonth = new Date().toISOString().slice(0, 7); // "2026-06"
-  if (usage.month !== thisMonth) {
-    usage.month = thisMonth;
-    usage.chars = 0;
-    usage.calls = 0;
-    saveMonthlyUsage(usage);
+/** 从 DB 加载本月用量到缓存（队列启动时调用一次） */
+async function initUsageCache(): Promise<void> {
+  if (usageCache) return;
+  usageCache = await loadUsageFromDb();
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  if (usageCache.month !== thisMonth) {
+    usageCache = { month: thisMonth, chars: 0, calls: 0 };
+    await saveUsageToDb(usageCache);
   }
-  return usage;
+}
+
+/** 获取当前用量（同步，内存缓存） */
+function getUsage(): MonthlyUsage {
+  if (!usageCache) {
+    usageCache = { month: new Date().toISOString().slice(0, 7), chars: 0, calls: 0 };
+  }
+  return usageCache;
 }
 
 /** 检查翻译配额，成功则扣减并返回 true，超限返回 false */
 function checkAndDeductQuota(texts: string[]): boolean {
   const totalChars = texts.reduce((s, t) => s + t.length, 0);
-  if (totalChars === 0) return true; // 无字符无需扣减
+  if (totalChars === 0) return true;
 
-  const usage = getOrInitMonthlyUsage();
-
+  const usage = getUsage();
   if (usage.chars + totalChars > MAX_MONTHLY_CHARS) {
     console.warn(
-      `[Translator] Monthly quota exhausted (${usage.chars}/${MAX_MONTHLY_CHARS}), ` +
+      `[Translator] Monthly quota exceeded (${usage.chars + totalChars}/${MAX_MONTHLY_CHARS}), ` +
       `remaining articles will retry next month`
     );
-    // 注意：不标记文章已翻译，下月配额重置后会自动重试
     return false;
   }
 
   usage.chars += totalChars;
   usage.calls += 1;
-  saveMonthlyUsage(usage);
+
+  // 异步写回 DB（不 await，不阻塞翻译流程）
+  saveUsageToDb(usage).catch(err =>
+    console.warn(`[Translator] Failed to persist quota: ${err.message}`)
+  );
+
   return true;
 }
 
 /** 当月配额是否已耗尽 */
 function isQuotaExhausted(): boolean {
-  return getOrInitMonthlyUsage().chars >= MAX_MONTHLY_CHARS;
+  return getUsage().chars >= MAX_MONTHLY_CHARS;
 }
 
 /** 获取本月翻译用量统计 */
 export function getTranslationStats(): { month: string; chars: number; calls: number; limit: number } {
-  const usage = getOrInitMonthlyUsage();
+  const usage = getUsage();
   return { ...usage, limit: MAX_MONTHLY_CHARS };
 }
 
@@ -184,22 +190,22 @@ function decideTranslationScope(
   const isEngTitle = !!title && !isChineseContent(title);
   const isEngSummary = !!summary && !isChineseContent(summary);
 
-  // 官方博客：全译
+  // 官方博客：只翻标题（v1.1.1 收紧，原为全翻）
   if (['openai_blog', 'google_ai_blog', 'huggingface_blog'].includes(sourceSlug)) {
-    return { translateTitle: isEngTitle, translateSummary: isEngSummary };
+    return { translateTitle: isEngTitle, translateSummary: false };
   }
-  // Hacker News：只翻标题
+  // Hacker News：只翻标题（不变）
   if (sourceSlug === 'hacker_news') {
     return { translateTitle: isEngTitle, translateSummary: false };
   }
-  // 按热度分层
-  if (hotScore >= 65) {
+  // 按热度分层（v1.1.1 收紧阈值，控制月度消耗）
+  if (hotScore >= 80) {
     return { translateTitle: isEngTitle, translateSummary: isEngSummary };
   }
-  if (hotScore >= 40) {
+  if (hotScore >= 60) {
     return { translateTitle: isEngTitle, translateSummary: false };
   }
-  // < 40：跳过
+  // < 60：跳过
   return { translateTitle: false, translateSummary: false };
 }
 
@@ -347,8 +353,11 @@ export async function runTranslationQueue(): Promise<void> {
     return;
   }
 
+  // 从 DB 初始化配额缓存（确保重启后能正确继承）
+  await initUsageCache();
+
   // 先检查当月配额是否已耗尽（含最小剩余量检查）
-  const usage = getOrInitMonthlyUsage();
+  const usage = getUsage();
   if (usage.chars >= MAX_MONTHLY_CHARS) {
     console.log(`[Translator] Monthly quota used up (${usage.chars}/${MAX_MONTHLY_CHARS}), queue skipped`);
     return;

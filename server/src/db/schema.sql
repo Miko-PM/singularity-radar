@@ -46,8 +46,9 @@ ALTER TABLE articles ALTER COLUMN title_zh DROP NOT NULL;
 ALTER TABLE articles ALTER COLUMN summary_zh DROP NOT NULL;
 ALTER TABLE articles ALTER COLUMN title_zh SET DEFAULT NULL;
 ALTER TABLE articles ALTER COLUMN summary_zh SET DEFAULT NULL;
-UPDATE articles SET title_zh = NULL WHERE title_zh = '';
-UPDATE articles SET summary_zh = NULL WHERE summary_zh = '';
+-- 注意：以下 UPDATE 是 V1.1 上线时的一次性数据迁移，注释掉避免每部署重置
+-- UPDATE articles SET title_zh = NULL WHERE title_zh = '';
+-- UPDATE articles SET summary_zh = NULL WHERE summary_zh = '';
 
 -- V1.1: GitHub 仓库星数字段（常青榜/新锐榜/趋势榜）
 ALTER TABLE articles ADD COLUMN IF NOT EXISTS stars INTEGER DEFAULT 0;
@@ -74,6 +75,18 @@ CREATE TABLE IF NOT EXISTS tag_keywords (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- V1.1.1: 翻译用量跟踪（代替本地文件，避免重启丢失）
+CREATE TABLE IF NOT EXISTS translation_usage (
+  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  month TEXT NOT NULL,
+  chars INTEGER NOT NULL DEFAULT 0,
+  calls INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+INSERT INTO translation_usage (id, month, chars, calls)
+VALUES (1, '', 0, 0)
+ON CONFLICT (id) DO NOTHING;
 
 -- 热门议题（预计算）
 CREATE TABLE IF NOT EXISTS hot_topics (

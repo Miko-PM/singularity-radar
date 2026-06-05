@@ -8,7 +8,7 @@ import AdminPage from './pages/AdminPage.tsx';
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('hot');
   const [activeFilter, setActiveFilter] = useState<string>(() => {
-    return localStorage.getItem('activeFilter') || 'latest';
+    return localStorage.getItem('activeFilter') || 'hot';
   });
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [activeSource, setActiveSource] = useState<string>('');
