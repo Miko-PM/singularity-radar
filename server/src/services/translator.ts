@@ -60,7 +60,14 @@ async function rateLimitedTranslate(client: InstanceType<typeof tmt.v20180321.Cl
     });
     return resp.TargetText ?? null;
   } catch (err: any) {
-    console.warn(`[Translator] Tencent API error: ${err.message}`);
+    const msg = err.message || '';
+    if (msg.includes('used up') || msg.includes('free amount')) {
+      console.error(`[Translator] Tencent monthly quota exhausted, auto-pausing translation`);
+      // 自动暂停翻译，避免 cron 每 10 分钟空转重试
+      setTranslationPaused(true).catch(() => {});
+    } else {
+      console.warn(`[Translator] Tencent API error: ${msg}`);
+    }
     return null;
   }
 }
