@@ -426,7 +426,7 @@ export default function AdminPage({ onBack }: Props) {
                 <h3 className="font-label text-xs text-[var(--text-secondary)] tracking-wider uppercase">翻译器状态</h3>
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`inline-block w-2 h-2 rounded-full ${transStatus.paused ? 'bg-red-500' : 'bg-green-500'}`} />
-                  <span className="font-label text-xs text-[var(--text-primary)]">
+                  <span className={`font-label text-xs ${transStatus.paused ? 'text-red-400' : 'text-green-400'}`}>
                     {transStatus.paused ? '已暂停' : '运行中'}
                   </span>
                   <span className="text-[var(--text-dim)] text-xs font-label">
@@ -436,11 +436,7 @@ export default function AdminPage({ onBack }: Props) {
                 </div>
               </div>
               <button onClick={handleToggleTranslator} disabled={togglingTrans}
-                className={`shrink-0 font-label text-xs px-4 py-2 rounded-lg border transition-colors disabled:opacity-40 ${
-                  transStatus.paused
-                    ? 'bg-green-900/20 border-green-500/30 text-green-400 hover:bg-green-900/30'
-                    : 'bg-red-900/20 border-red-500/30 text-red-400 hover:bg-red-900/30'
-                }`}>
+                className="shrink-0 font-label text-xs px-4 py-2 rounded-lg bg-[var(--gold-bg)]/10 border border-[var(--gold)]/20 text-[var(--gold)] hover:bg-[var(--gold-bg)]/15 transition-colors disabled:opacity-40">
                 {togglingTrans ? '处理中…' : transStatus.paused ? '恢复翻译' : '暂停翻译'}
               </button>
             </div>
