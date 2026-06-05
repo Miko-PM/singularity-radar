@@ -96,6 +96,10 @@ export default function AdminPage({ onBack }: Props) {
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  // Translation status
+  const [transStatus, setTransStatus] = useState<any>(null);
+  const [togglingTrans, setTogglingTrans] = useState(false);
+
   // ── Computed validation ──
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -109,11 +113,12 @@ export default function AdminPage({ onBack }: Props) {
 
   const isValid = Object.keys(errors).length === 0;
 
-  // ── Effect: fetch stats + articles on login ──
+  // ── Effect: fetch stats + articles + translator status on login ──
   useEffect(() => {
     if (authenticated) {
       fetchStats();
       fetchArticles();
+      fetchTranslatorStatus();
     }
   }, [authenticated]);
 
@@ -309,6 +314,30 @@ export default function AdminPage({ onBack }: Props) {
     } catch (err: any) { setResult(`错误：${err.message}`); }
   }
 
+  async function fetchTranslatorStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/translator/status`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const json = await res.json();
+      if (json.data) setTransStatus(json.data);
+    } catch {}
+  }
+
+  async function handleToggleTranslator() {
+    setTogglingTrans(true);
+    const newPaused = !transStatus?.paused;
+    try {
+      await fetch(`${API_BASE}/api/admin/translator/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ paused: newPaused }),
+      });
+      await fetchTranslatorStatus();
+    } catch {}
+    setTogglingTrans(false);
+  }
+
   async function handleReheat() {
     setResult('重算热度中…');
     try {
@@ -386,6 +415,35 @@ export default function AdminPage({ onBack }: Props) {
                 <p className="font-label text-[10px] text-[var(--text-dim)] mt-0.5">{s.label}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Translation status */}
+        {transStatus && (
+          <div className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-label text-xs text-[var(--text-secondary)] tracking-wider uppercase">翻译器状态</h3>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${transStatus.paused ? 'bg-red-500' : 'bg-green-500'}`} />
+                  <span className="font-label text-xs text-[var(--text-primary)]">
+                    {transStatus.paused ? '已暂停' : '运行中'}
+                  </span>
+                  <span className="text-[var(--text-dim)] text-xs font-label">
+                    {transStatus.chars.toLocaleString()} / {transStatus.limit.toLocaleString()} 字符
+                    （{Math.round(transStatus.chars / transStatus.limit * 100)}%）
+                  </span>
+                </div>
+              </div>
+              <button onClick={handleToggleTranslator} disabled={togglingTrans}
+                className={`shrink-0 font-label text-xs px-4 py-2 rounded-lg border transition-colors disabled:opacity-40 ${
+                  transStatus.paused
+                    ? 'bg-green-900/20 border-green-500/30 text-green-400 hover:bg-green-900/30'
+                    : 'bg-red-900/20 border-red-500/30 text-red-400 hover:bg-red-900/30'
+                }`}>
+                {togglingTrans ? '处理中…' : transStatus.paused ? '恢复翻译' : '暂停翻译'}
+              </button>
+            </div>
           </div>
         )}
 

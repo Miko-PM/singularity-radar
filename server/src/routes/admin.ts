@@ -5,7 +5,7 @@ import { calculateHeatScore, getHoursAgo, reheatAll, scoreArticle } from '../ser
 import { tagArticle, retagAllArticles } from '../services/tagger.js';
 import { fetchAll } from '../services/fetcher.js';
 import { generateHotTopics } from '../services/hotTopics.js';
-import { runTranslationQueue } from '../services/translator.js';
+import { runTranslationQueue, getTranslationStats, setTranslationPaused, getTranslationPaused } from '../services/translator.js';
 
 const router = Router();
 
@@ -229,6 +229,31 @@ router.get('/stats', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[API] GET /admin/stats error:', err.message);
     res.status(500).json({ data: null, error: 'internal error' });
+  }
+});
+
+// GET /api/admin/translator/status — 翻译器状态
+router.get('/translator/status', async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const stats = getTranslationStats();
+    const paused = await getTranslationPaused();
+    res.json({ data: { ...stats, paused }, error: null });
+  } catch (err: any) {
+    res.status(500).json({ data: null, error: err.message });
+  }
+});
+
+// POST /api/admin/translator/toggle — 暂停/恢复翻译
+router.post('/translator/toggle', async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const { paused } = req.body;
+    await setTranslationPaused(paused === true);
+    console.log(`[Admin] Translation ${paused ? 'paused' : 'resumed'} by admin`);
+    res.json({ data: { paused: paused === true }, error: null });
+  } catch (err: any) {
+    res.status(500).json({ data: null, error: err.message });
   }
 });
 

@@ -182,6 +182,26 @@ export function getTranslationStats(): { month: string; chars: number; calls: nu
   return { ...usage, limit: MAX_MONTHLY_CHARS };
 }
 
+/** 查询翻译是否被管理员暂停 */
+export async function getTranslationPaused(): Promise<boolean> {
+  try {
+    const res = await query<{ paused: boolean }>(
+      `SELECT paused FROM translation_usage WHERE id = 1`
+    );
+    return res.rows[0]?.paused === true;
+  } catch {
+    return false;
+  }
+}
+
+/** 设置翻译暂停/恢复 */
+export async function setTranslationPaused(paused: boolean): Promise<void> {
+  await query(
+    `UPDATE translation_usage SET paused = $1, updated_at = NOW() WHERE id = 1`,
+    [paused]
+  );
+}
+
 /** 按来源/热度分层决策是否需要翻译以及翻译哪些字段 */
 function decideTranslationScope(
   title: string, summary: string,
@@ -355,6 +375,12 @@ export async function runTranslationQueue(): Promise<void> {
 
   // 从 DB 初始化配额缓存（确保重启后能正确继承）
   await initUsageCache();
+
+  // 检查是否被管理员暂停
+  if (await getTranslationPaused()) {
+    console.log('[Translator] Translation paused by admin, queue skipped');
+    return;
+  }
 
   // 先检查当月配额是否已耗尽（含最小剩余量检查）
   const usage = getUsage();

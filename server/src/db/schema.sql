@@ -88,6 +88,9 @@ INSERT INTO translation_usage (id, month, chars, calls)
 VALUES (1, '', 0, 0)
 ON CONFLICT (id) DO NOTHING;
 
+-- V1.1.1: 翻译手动暂停开关
+ALTER TABLE translation_usage ADD COLUMN IF NOT EXISTS paused BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- 热门议题（预计算）
 CREATE TABLE IF NOT EXISTS hot_topics (
   id SERIAL PRIMARY KEY,
