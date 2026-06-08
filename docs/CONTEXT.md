@@ -1,6 +1,6 @@
 # Session Context
 
-最后更新：2026-06-04
+最后更新：2026-06-05
 
 > 维护方式：每次结束一段工作或切换任务时，Claude 更新此文件。
 > 目的是在会话中断（关机、关窗口、超时压缩）后快速恢复上下文。
@@ -9,13 +9,24 @@
 
 ## 当前状态
 
-- **V1.1.1 已发布上线**（2026-06-04 部署）
+- **V1.1.1 已发布上线**（2026-06-04 部署），**V1.1.1 hotfix 已部署**（2026-06-05）
 - 修复了翻译引擎切换（百度→腾讯 TMT）、数据源打散排序、GitHub Trending 排序霸榜、热度评分偏低、前端默认排序等线上问题
-- 对应文档均已更新（PRD、RELEASE_NOTES、CONTEXT）
+- 翻译功能已自动暂停（腾讯 TMT 月度额度耗尽），等待 7/1 重置
+- 对应文档均已更新（PRD、RELEASE_NOTES、RETROSPECTIVE、CONTEXT）
 
 ---
 
 ## 已完成
+
+### 2026-06-05 V1.1.1 翻译热修复（续）
+- **配额存储迁移**：`translation_quota.json`（Render 临时文件系统）→ PostgreSQL `translation_usage` 表
+- **Schema 修复**：注释掉每次部署重置 `''→NULL` 的 UPDATE 语句
+- **分级策略收紧**：≥80 全翻, ≥60 仅标题, <60 跳过（原 ≥65/≥40）
+- **官方博客降级**：openai/google/huggingface 博客改为仅翻标题（原为全翻）
+- **自动暂停**：检测到"used up"/"free amount"错误时自动 `setTranslationPaused(true)`
+- **队列上限**：单次运行最多处理 400 条，每条前检查 `isQuotaExhausted()`
+- **管理员开关**：Admin 页面翻译状态卡片（运行中/已暂停 + 用量进度条 + 暂停/恢复按钮）
+- **状态持久化**：`paused` 列写入 DB，永不自动重置，仅管理员手动修改
 
 ### 2026-06-04 V1.1.1 热修复
 - **翻译引擎切换**：百度翻译（额度耗尽）→ 腾讯云 TMT SDK
@@ -89,11 +100,11 @@ diversifyBySource(articles, windowSize=3, penalty=18)
 ### 翻译分级策略
 ```
 decideTranslationScope(title, summary, hotScore, sourceSlug):
-  hotScore ≥ 65 → 标题 + 摘要全翻
-  hotScore ≥ 40 → 仅翻译标题
-  hotScore < 40 → 跳过
+  hotScore ≥ 80 → 标题 + 摘要全翻
+  hotScore ≥ 60 → 仅翻译标题
+  hotScore < 60 → 跳过
 
-  官方博客（openai/google/huggingface）→ 全翻（无视热度）
+  官方博客（openai/google/huggingface）→ 仅翻译标题（v1.1.1 收紧）
   Hacker News → 仅标题（无视热度）
 ```
 
@@ -101,11 +112,15 @@ decideTranslationScope(title, summary, hotScore, sourceSlug):
 - 腾讯云 TMT SDK（`tencentcloud-sdk-nodejs-tmt`），非百度翻译
 - 限速 330ms/req（5 req/s 限制）
 - 月度配额 4,500,000 字符，低于 200 停止
+- 配额存储：PostgreSQL `translation_usage` 表，部署不丢失
+- 自动暂停：API 返回额度耗尽错误时自动暂停
+- 管理员开关：Admin 页面可手动暂停/恢复，状态持久化到 DB
 
 ### 翻译 NULL 语义
 - `NULL` = 未处理（队列扫描）
 - `''` = 已处理但无需翻译（跳过）
 - 非空 = 已翻译
+- ⚠️ `paused` 列（DB）：`true` = 暂停，永不自动重置为 `false`
 
 ### 正则规范
 - 短关键词（≤4 字符）必须加 `\b` word boundary

@@ -152,7 +152,7 @@ export async function fetchEvergreenRepos(): Promise<number> {
   return count;
 }
 
-/** 新锐榜：近 30 天 star 增量最快的 AI 仓库 */
+/** 新锐榜：每次抓取同步更新的增长中 AI 仓库 */
 export async function fetchRisingRepos(): Promise<number> {
   const sourceId = await getSourceId('github_rising');
   if (!sourceId) {
@@ -162,26 +162,54 @@ export async function fetchRisingRepos(): Promise<number> {
 
   const start = Date.now();
   let count = 0;
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const dateStr = thirtyDaysAgo.toISOString().slice(0, 10);
+  const now = new Date();
+
+  // 预查现有 GitHub 仓库 URL（避免重复插入）
+  const existingUrls = new Set<string>();
+  const existing = await query("SELECT url FROM articles WHERE url LIKE 'https://github.com/%'");
+  for (const row of existing.rows) existingUrls.add(row.url);
+
+  /** 插入新仓库（去重后） */
+  const insertNew = async (repos: GitHubRepo[]): Promise<number> => {
+    let n = 0;
+    for (const repo of repos) {
+      if (existingUrls.has(repo.html_url)) continue;
+      if (await insertRepo(repo, sourceId, true)) {
+        existingUrls.add(repo.html_url); // 去重集合同步更新
+        n++;
+      }
+    }
+    return n;
+  };
 
   try {
-    // 新锐榜关注近 30 天活跃的中等星数项目（避开长青榜高星区间）
-    const repos = await searchRepos(`topic:ai stars:1000..50000 pushed:>${dateStr}`, 'stars', 'desc', 20);
-    console.log(`[GitHubHistory] Rising search returned ${repos.length} repos`);
+    // ── 通道 A：近期活跃的中等星数仓库（按 pushed 排序，每次 cron 能找到不同的） ──
+    const recentDate = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 10);
+    const activeRepos = await searchRepos(
+      `topic:ai stars:500..30000 pushed:>${recentDate}`, 'pushed', 'desc', 20
+    );
+    console.log(`[GitHubHistory] Rising active search returned ${activeRepos.length} repos`);
+    count += await insertNew(activeRepos);
 
-    // 过滤掉已收录的仓库（含长青榜、趋势榜等）
-    const existingUrls = new Set<string>();
-    const existing = await query("SELECT url FROM articles WHERE url LIKE 'https://github.com/%'");
-    for (const row of existing.rows) existingUrls.add(row.url);
+    // ── 通道 B：新创建的 AI 仓库（created 排序，发现新兴项目） ──
+    if (count < 10) {
+      const createdDate = new Date(now.getTime() - 60 * 86400000).toISOString().slice(0, 10);
+      const newRepos = await searchRepos(
+        `topic:ai stars:>300 created:>${createdDate}`, 'stars', 'desc', 10
+      );
+      console.log(`[GitHubHistory] Rising new-repo search returned ${newRepos.length} repos`);
+      count += await insertNew(newRepos);
+    }
 
-    for (const repo of repos) {
-      if (existingUrls.has(repo.html_url)) {
-        console.log(`[GitHubHistory] Skipping ${repo.full_name} (already exists)`);
-        continue;
-      }
-      if (await insertRepo(repo, sourceId, true)) count++;
+    // ── 通道 C（兜底）：描述关键词搜索，跳过 topic:ai 限制 ──
+    if (count < 5) {
+      const recentDate2 = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 10);
+      const descRepos = await searchRepos(
+        `"ai" OR "llm" OR "machine learning" in:description stars:1000..20000 pushed:>${recentDate2}`,
+        'pushed', 'desc', 10
+      );
+      console.log(`[GitHubHistory] Rising description fallback returned ${descRepos.length} repos`);
+      count += await insertNew(descRepos);
     }
 
     console.log(`[GitHubHistory] Rising: ${count} new repos (${Date.now() - start}ms)`);

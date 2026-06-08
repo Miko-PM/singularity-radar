@@ -24,11 +24,11 @@ interface FetchResult {
   elapsed: number;
 }
 
-async function fetchFeed(url: string): Promise<string | null> {
+async function fetchFeed(url: string, timeoutMs: number = 15000): Promise<string | null> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
@@ -213,6 +213,120 @@ async function fetchGitHubTrending(source: Source): Promise<FetchResult> {
   }
 }
 
+/** 抓取 Hugging Face Blog（HTML scraping，feed.xml 的 CloudFront TLS 常被阻断） */
+async function fetchHuggingFaceBlog(source: Source): Promise<FetchResult> {
+  const start = Date.now();
+  try {
+    const html = await fetchFeed('https://huggingface.co/blog', 15000);
+    if (!html) {
+      // 第二尝试：blog 主页也被 TLS 阻断，尝试不同子域名
+      const altHtml = await fetchFeed('https://huggingface.co/blog/index.xml', 10000);
+      if (!altHtml) {
+        return { source: source.name, success: false, newCount: 0, error: 'All HuggingFace URLs failed', elapsed: Date.now() - start };
+      }
+      // 如果是 xml feed (index.xml 可能包含 Atom 格式)
+      const items = await parseRSS(altHtml);
+      return processFeedItems(source, items, start);
+    }
+
+    const $ = cheerio.load(html);
+    const articles: any[] = [];
+
+    // Hugging Face blog 的卡片结构：article.blog-card-article 或 .blog-article-card
+    $('article, .blog-card, [class*="blog"]').each((_: any, el: any) => {
+      const $el = $(el);
+      const linkEl = $el.find('a[href*="/blog/"]').first();
+      const href = linkEl.attr('href') || '';
+      if (!href || !href.includes('/blog/')) return;
+
+      const fullUrl = href.startsWith('http') ? href : `https://huggingface.co${href}`;
+      const title = $el.find('h2, h3, .title, [class*="title"]').first().text().trim();
+      if (!title) return;
+
+      const desc = $el.find('p, .description, [class*="desc"]').first().text().trim().slice(0, 500);
+      const imgEl = $el.find('img').first();
+      const imageUrl = imgEl.attr('src') || '';
+      const timeEl = $el.find('time, [datetime]').first();
+      const pubDate = timeEl.attr('datetime') || timeEl.text().trim();
+
+      articles.push({ title, link: fullUrl, summary: desc, imageUrl, pubDate });
+    });
+
+    // 降级：如果 cheerio 没解析到结果，尝试用简单正则提取
+    if (articles.length === 0) {
+      const linkRegex = /<a\s+href="(\/blog\/[^"]+)"[^>]*>([^<]+)<\/a>/gi;
+      let match;
+      const seen = new Set<string>();
+      while ((match = linkRegex.exec(html)) !== null) {
+        const href = match[1];
+        const title = cheerio.load(match[0])().text().trim();
+        if (!title || seen.has(href)) continue;
+        seen.add(href);
+        articles.push({
+          title,
+          link: `https://huggingface.co${href}`,
+          summary: '',
+          imageUrl: '',
+          pubDate: '',
+        });
+      }
+    }
+
+    return processFeedItems(source, articles, start);
+  } catch (err: any) {
+    return { source: source.name, success: false, newCount: 0, error: err.message, elapsed: Date.now() - start };
+  }
+}
+
+/** 处理 feed 解析后的条目（插入数据库），共用逻辑 */
+async function processFeedItems(source: Source, items: any[], start: number): Promise<FetchResult> {
+  let newCount = 0;
+  for (const item of items) {
+    const title = (item.title || '').trim();
+    if (!title) continue;
+
+    let link = item.link || item.id || '';
+    if (!link || !/^https?:\/\//.test(link)) continue;
+
+    let summary = (item.summary || item.description || '').trim().slice(0, 500);
+
+    const author = item.author || '';
+    const pubDate = item.pubDate || item.published || item.updated || '';
+    const imageUrl = item.imageUrl || item.image_url || '';
+
+    try {
+      let catForScore: string = source.category;
+      if (source.slug === 'huggingface_blog') catForScore = 'huggingface_blog';
+
+      const pubDateObj = pubDate ? new Date(pubDate) : new Date();
+      const hoursAgo = getHoursAgo(pubDateObj.toISOString());
+      const hasImage = !!imageUrl;
+      const hotScore = calculateHeatScore(catForScore, undefined, hoursAgo, hasImage);
+
+      const result = await query<Article>(
+        `INSERT INTO articles (source_id, title, url, summary, author, published_at, image_url, hot_score)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (url) DO UPDATE SET
+           hot_score = EXCLUDED.hot_score,
+           image_url = CASE WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url ELSE articles.image_url END,
+           summary = CASE WHEN articles.summary = '' THEN EXCLUDED.summary ELSE articles.summary END
+         RETURNING id`,
+        [source.id, title, link, summary, author, pubDateObj.toISOString(), imageUrl, hotScore]
+      );
+
+      if (result.rows.length > 0) {
+        await tagArticle(result.rows[0].id, `${title} ${summary}`);
+        newCount++;
+      }
+    } catch (err: any) {
+      if (err.code !== '23505') {
+        console.warn(`[Fetch] Error processing "${title.slice(0, 40)}":`, err.message);
+      }
+    }
+  }
+  return { source: source.name, success: true, newCount, elapsed: Date.now() - start };
+}
+
 async function fetchSingleSource(source: Source): Promise<FetchResult> {
   const start = Date.now();
 
@@ -222,18 +336,25 @@ async function fetchSingleSource(source: Source): Promise<FetchResult> {
   }
 
   try {
-    let xml = await fetchFeed(source.feed_url);
+    // 播客 RSS 通常较大（含历史剧集），给予更长超时
+    const timeout = source.category === 'podcast' ? 30000 : 15000;
+    let xml = await fetchFeed(source.feed_url, timeout);
 
     // 主地址失败，尝试备用地址
     if (!xml) {
       const fallbacks: string[] = JSON.parse(source.fallback_urls || '[]');
       for (const fb of fallbacks) {
-        xml = await fetchFeed(fb);
+        xml = await fetchFeed(fb, timeout);
         if (xml) break;
       }
     }
 
     if (!xml) {
+      // Hugging Face Blog: RSS feed TLS 常被 CloudFront 阻断，降级到 HTML scraping
+      if (source.slug === 'huggingface_blog') {
+        console.log('[Fetch] HuggingFace feed failed, falling back to HTML scraping...');
+        return fetchHuggingFaceBlog(source);
+      }
       return {
         source: source.name,
         success: false,

@@ -58,3 +58,21 @@ Singularity Radar 正式上线。AI 资讯聚合平台，覆盖 GitHub Trending�
 - 置顶贴排序问题：`ORDER BY` 增加 `is_pinned DESC, pinned_at DESC NULLS LAST` 确保置顶排在前面
 - 长青榜封顶未覆盖批量重算：`reheatAll()` 和 `scoreArticle()` 均增加 evergreen cap 检查
 - 36氪非 AI 内容泄漏：数据库清除 139 条财经噪音数据，增强过滤正则
+
+## V1.1.2 — 2026-06-05
+
+翻译专项修复——配额持久化、策略收紧、自动暂停、管理员开关。
+
+### 修复
+- **配额存储迁移**：`translation_quota.json`（Render 临时文件系统）→ PostgreSQL `translation_usage` 表
+- **Schema 幂等修复**：注释掉每次部署重置 `''→NULL` 的 UPDATE 语句
+
+### 变更
+- **分级策略收紧**：≥80 全翻 / ≥60 仅标题 / <60 跳过（原 ≥65/≥40）
+- **官方博客降级**：openai/google/huggingface 博客改为仅翻标题（原为全翻）
+
+### 新增
+- **自动暂停**：腾讯 API 返回 "used up" 错误时自动暂停翻译，队列停止空转
+- **管理员开关**：Admin 页面翻译状态卡片 + 暂停/恢复按钮，状态 DB 持久化
+- **翻译状态 API**：`GET /api/admin/translator/status` + `POST /api/admin/translator/toggle`
+- **队列保护**：单次最多处理 400 条，逐条检查 `isQuotaExhausted()`

@@ -127,7 +127,12 @@ export async function scoreArticle(article: Article): Promise<number> {
   if (sourceRes.rows.length === 0) return 0;
 
   const { category, slug } = sourceRes.rows[0];
-  const hoursAgo = getHoursAgo(article.published_at);
+
+  const isPinned = (article as any).is_pinned === true;
+  const pinnedAt = (article as any).pinned_at;
+  // 置顶文章的热度衰减参考时间 = pinned_at（而非 published_at），避免旧文章因 published_at 过久获得过低 recency_boost
+  const refTime = isPinned && pinnedAt ? pinnedAt : article.published_at;
+  const hoursAgo = getHoursAgo(refTime);
 
   let categoryForScore = category;
   if (slug === 'xinzhiyuan') categoryForScore = 'xinzhiyuan';
@@ -144,8 +149,6 @@ export async function scoreArticle(article: Article): Promise<number> {
   const tagRes = await query(`SELECT COUNT(*) AS cnt FROM article_tags WHERE article_id = $1`, [article.id]);
   const tagCount = parseInt(tagRes.rows[0]?.cnt || '0', 10);
 
-  const isPinned = (article as any).is_pinned === true;
-  const pinnedAt = (article as any).pinned_at;
   const stars = (article as any).stars;
 
   let score = calculateHeatScore(categoryForScore, stars, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);
@@ -178,7 +181,11 @@ export async function reheatAll(): Promise<number> {
   for (const article of articles.rows) {
     const sourceSlug = (article as any).slug;
     const category = (article as any).category;
-    const hoursAgo = getHoursAgo(article.published_at);
+    const isPinned = (article as any).is_pinned === true;
+    const pinnedAt = (article as any).pinned_at;
+    // 置顶文章以 pinned_at 为衰减参考时间
+    const refTime = isPinned && pinnedAt ? pinnedAt : article.published_at;
+    const hoursAgo = getHoursAgo(refTime);
 
     let catForScore = category;
     if (sourceSlug === 'xinzhiyuan') catForScore = 'xinzhiyuan';
@@ -194,8 +201,6 @@ export async function reheatAll(): Promise<number> {
     const hasImage = !!article.image_url;
     const tagCount = tagCounts.get(article.id) ?? 0;
 
-    const isPinned = (article as any).is_pinned === true;
-    const pinnedAt = (article as any).pinned_at;
     const stars = (article as any).stars;
 
     let score = calculateHeatScore(catForScore, stars, hoursAgo, hasImage, tagCount, isPinned, pinnedAt);

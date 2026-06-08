@@ -11,7 +11,7 @@ INSERT INTO sources (name, slug, feed_url, category, update_interval, fallback_u
   ('36氪', '36kr', 'https://36kr.com/feed', 'news', 'daily', '[]', true),
   ('雷峰网', 'leiphone', 'https://www.leiphone.com/feed', 'news', 'daily', '[]', true),
   ('Lenny''s Podcast', 'lennys_podcast', 'https://www.lennysnewsletter.com/feed', 'podcast', 'weekly', '[]', true),
-  ('硅谷101', 'sv101', 'https://sv101.fireside.fm/rss', 'podcast', 'weekly', '[]', true),
+  ('硅谷101', 'sv101', 'https://sv101.fireside.fm/rss', 'podcast', 'weekly', '["https://feeds.fireside.fm/sv101/rss"]', true),
   ('管理员爆料', 'admin_post', '', 'news', 'daily', '[]', true),
   -- V1.1: 新增数据源
   ('Product Hunt', 'product_hunt', 'https://www.producthunt.com/feed', 'opensource', 'daily', '[]', true),

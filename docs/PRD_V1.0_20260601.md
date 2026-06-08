@@ -8,6 +8,7 @@
 | v1.0 | 2026-06-01 | Claude | 正式发布：自定义域名、保活监控、数据新鲜度修复、部署调整 | **已发布** | miko | 2026-06-01 |
 | v1.1 | 2026-06-02 | Claude | 英文翻译、GitHub 历史热门 AI 仓库、爆料编辑/预览/验证、新增 RSS 数据源、热度评分平衡调整、置顶衰减 | **已发布** | miko | 2026-06-02 |
 | v1.1.1 | 2026-06-04 | Claude | 翻译引擎切换腾讯TMT、分级翻译策略、数据源打散排序、前端默认排序调整、GitHub Trending 发布时间修复、热度评分上调（含今日星数加成） | **已发布** | miko | 2026-06-04 |
+| v1.1.2 | 2026-06-05 | Claude | 翻译配额迁移DB（修复Render部署重置）、分级策略收紧≥80/≥60、自动暂停+管理员开关、Schema UPDATE幂等修复 | **已发布** | miko | 2026-06-05 |
 
 ---
 
@@ -25,7 +26,9 @@
 > | 7 | **数据源打散排序**：penalty 算法，windowSize=3 惩罚同源文章 18 分，高热模式下生效 | P0 | [§5.2.4](#524-热度评分算法) |
 > | 8 | **翻译引擎切换腾讯TMT**：百度翻译额度耗尽后切换到腾讯云 TMT，引入 330ms 间隔限速 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
 > | 9 | **前端默认排序调整**：默认展示"最新情报"，中文筛选默认关闭，偏好 localStorage 持久化 | P0 | [§5.1.2](#512-导航侧栏内容) |
-> | 10 | **翻译/历史仓库/新源对应的验收标准** | — | [§10.5](#105-v11-验收) |
+> | 10 | **翻译配额 DB 持久化**：配额迁移 PostgreSQL，消除 Render 部署重置问题 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
+> | 11 | **翻译自动暂停 + 管理员开关**：额度耗尽自动暂停，Admin 页面手动恢复 | P0 | [§5.5](#55-英文内容翻译p0-v11) |
+> | 12 | **翻译/历史仓库/新源对应的验收标准** | — | [§10.5](#105-v11-验收) |
 
 ---
 
@@ -252,7 +255,7 @@ flowchart TD
 ### 4.4 数据流说明
 
 1. **定时抓取**：node-cron 在 UTC+8 8:00/12:00/18:00/22:00 触发全量抓取（共17个数据源，机器之心已禁用）
-2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 入库（不等翻译，URL 去重）→ 异步翻译队列（v1.1）扫描未翻译文章 → 腾讯云 TMT 翻译（330ms 间隔限速）→ 按热度分级决定翻译范围 → 写入 title_zh/summary_zh
+2. **抓取链路**：RSS/HTML/Search API → 解析 → 热度评分 → 标签匹配 → 入库（不等翻译，URL 去重）→ 异步翻译队列（v1.1）扫描未翻译文章 → 腾讯云 TMT 翻译（330ms 间隔限速，配额 DB 持久化）→ 按热度分级（≥80 全翻/≥60 仅标题/<60 跳过，v1.1.2 收紧）决定翻译范围 → 写入 title_zh/summary_zh → 配额耗尽自动暂停
 3. **历史仓库**（v1.1）：首次种子数据一次性拉取 50 条高星仓库（常青榜），之后每周增量更新一次；新锐榜随每次抓取同步更新
 4. **前端渲染**：React 请求 REST API → JSON 响应（title_zh 非空时优先返回翻译版）→ 骨架屏过渡 → 卡片渲染
 5. **用户交互**：筛选/排序/Tab切换 → URL参数变化 → API重新请求 → 内容刷新
@@ -571,6 +574,8 @@ flowchart TD
 | POST | /api/admin/retag | 全量重新打标签 | Bearer Token | — |
 | POST | /api/admin/reheat | 全量重算热度评分 | Bearer Token | — |
 | GET | /api/admin/stats | 数据统计概览 | Bearer Token | — |
+| GET | /api/admin/translator/status | 翻译器状态（v1.1.2） | Bearer Token | 返回 month/chars/calls/limit/paused |
+| POST | /api/admin/translator/toggle | 暂停/恢复翻译（v1.1.2） | Bearer Token | body: `{ paused: boolean }` |
 
 **统一响应格式（含分页）：**
 ```json
@@ -738,6 +743,7 @@ bonus（额外加分）:
 - 全量重新打标签（`POST /api/admin/retag`，修改词库后触发）
 - 全量重算热度评分（`POST /api/admin/reheat`）
 - 查看数据统计概览（`GET /api/admin/stats`）
+- **查看翻译器状态 + 暂停/恢复翻译（v1.1.2：`GET /api/admin/translator/status` + `POST /api/admin/translator/toggle`）**
 
 ### 5.5 英文内容翻译（P0, v1.1）
 
@@ -759,30 +765,31 @@ bonus（额外加分）:
 
 > **阈值说明：** GitHub 仓库描述如"这是一个基于 Transformer 的框架，支持 LLaMA/Qwen/DeepSeek 等模型"中 CJK 占比约 20%，阈值设为 15% 可覆盖此类中英混写文本。上线后可基于实际数据微调。
 
-**分级翻译策略（v1.1.1 新增，成本优化）：**
+**分级翻译策略（v1.1.1 新增，v1.1.2 收紧）：**
 
 ```
 decideTranslationScope(title, summary, hotScore, sourceSlug)
 
-hotScore ≥ 65:
+hotScore ≥ 80:
   → 翻译标题 + 摘要（全文翻译）
-hotScore ≥ 40:
+hotScore ≥ 60:
   → 仅翻译标题（摘要不翻译，节省字符）
-hotScore < 40:
+hotScore < 60:
   → 跳过翻译（低热度内容无需翻译）
 
 数据源覆盖规则（无视热度）：
-  - 官方博客源（openai_blog / google_ai_blog / huggingface_blog）: 翻译标题 + 摘要
+  - 官方博客源（openai_blog / google_ai_blog / huggingface_blog）: 仅翻译标题（v1.1.2 收紧，原为全翻）
   - Hacker News: 仅翻译标题
   - 其他源: 按 hotScore 分级规则
 ```
 
 **设计理由（分级策略）：**
-- 百度翻译额度耗尽后发现每月 850K 字符远不能满足全量翻译（日均 300+ 新文章）
+- 百度翻译额度耗尽后发现每月 850K 字符远不能满足全量翻译
 - 切换腾讯 TMT 后需严格控制成本
-- 热度 ≥65 的高价值内容全翻，≥40 的至少翻译标题，<40 的暂不翻译
-- 官方博客默认全翻（内容权威性高）
-- 估算每月字符消耗：约 200K-400K 字符（取决于内容量）
+- 上线初期 backlog 积压大量未翻译文章，第一次消耗远超预期
+- 热度 ≥80 的高价值内容全翻，≥60 的至少翻译标题，<60 的暂不翻译
+- 官方博客收紧为仅翻标题（内容权威性高但消耗大）
+- v1.1.2 后估算每月字符消耗：约 60-120 万字符（收紧后）
 
 **API 限速（v1.1.1 新增）：**
 
@@ -800,10 +807,23 @@ async function rateLimitedTranslate(client, text) {
 }
 ```
 
-**字符配额管理（v1.1.1 新增）：**
+**字符配额管理（v1.1.1 新增，v1.1.2 迁移 DB）：**
 - 每月预算上限：4,500,000 字符（腾讯云 TMT 标准版）
 - 安全阈值：低于 200 字符时停止翻译，避免超额
-- 配额持久化：`server/data/translation_quota.json`（Render 临时文件系统，重启后从 DB 重建）
+- 配额持久化：~~`server/data/translation_quota.json`~~ → PostgreSQL `translation_usage` 表（v1.1.2 修复，消除 Render 临时文件系统部署重置问题）
+- 内存缓存 `usageCache` + 异步 `saveUsageToDb()` 写回，不阻塞翻译流程
+
+**自动暂停机制（v1.1.2 新增）：**
+- 检测到腾讯 API 返回 "used up" / "free amount" 错误时自动暂停翻译
+- `setTranslationPaused(true)` 写入 DB `paused` 列
+- 暂停后队列直接跳过扫描，不再空转重试
+- 状态永不自动重置，仅管理员手动恢复
+
+**管理员控制（v1.1.2 新增）：**
+- Admin 页面展示翻译状态卡片：当前状态（运行中/已暂停）、月度用量进度条
+- `GET /api/admin/translator/status` 返回 `{ month, chars, calls, limit, paused }`
+- `POST /api/admin/translator/toggle` 接收 `{ paused: boolean }`
+- 状态持久化到 DB，部署后不丢失
 
 **特殊处理：**
 - GitHub 标题 `owner/repo` 格式（无中文、无英文句子）→ 跳过翻译
@@ -811,19 +831,21 @@ async function rateLimitedTranslate(client, text) {
 - 翻译失败（超时/限流）→ 保留原文，下次抓取时重试
 - 后续 UPSERT 更新时，已有翻译结果的不重复调用（`title_zh != ''` 跳过）
 
-**异步翻译队列（不阻塞主抓取流程）：**
+**异步翻译队列（v1.1，不阻塞主抓取流程，v1.1.2 增加自动暂停 + 配额 DB 持久化）：**
 
 ```
 抓取 → 入库（title/summary 原文）→ 返回（不等翻译）
                                             ↓
               异步 translator 扫描 title_zh IS NULL 的文章
+                  ├── 已暂停？→ 跳过
+                  ├── 配额耗尽？→ 跳过
+                  └── 正常 → 分级判断 decideTranslationScope()
+                       ├── <60 跳过：UPDATE title_zh = ''（标记已处理）
+                       ├── ≥60 仅标题：调 TMT 翻译标题
+                       └── ≥80 全翻：调 TMT 翻译标题 + 摘要
                                             ↓
-              分级判断 decideTranslationScope()
-              ├── 跳过：UPDATE title_zh = ''（标记已处理）
-              ├── 仅标题：调 TMT 翻译标题
-              └── 全翻：调 TMT 翻译标题 + 摘要
-                                            ↓
-              更新 title_zh / summary_zh
+                  翻译成功 → 更新 title_zh / summary_zh
+                  翻译失败 → 检测到"used up" → 自动暂停
                                             ↓
               API 返回时优先返回翻译版 → 前端直接展示
 ```
@@ -836,7 +858,7 @@ async function rateLimitedTranslate(client, text) {
 **API 选择：** 腾讯云 TMT（标准版，免费 500 万字符/月，国内访问快）
 - 你需要做的事：在 [腾讯云控制台](https://console.cloud.tencent.com/) 开通 TMT 服务，创建密钥，配置为环境变量 `TENCENT_SECRET_ID`、`TENCENT_SECRET_KEY`、`TENCENT_REGION`
 
-> **版本迁移说明：** v1.1 初始使用百度翻译 API，2026-06-04 因免费额度耗尽（849,994/850,000 字符）切换到腾讯云 TMT。切换同时引入分级翻译策略以控制成本。如未来额度仍不足，可考虑升级付费套餐或进一步收紧翻译范围。
+> **版本迁移说明：** v1.1 初始使用百度翻译 API，2026-06-04 因免费额度耗尽（849,994/850,000 字符）切换到腾讯云 TMT。切换同时引入分级翻译策略以控制成本。**v1.1.2（2026-06-05）** 进一步收紧分级阈值（≥80/≥60）、将配额存储从 JSON 文件迁移到 PostgreSQL（修复 Render 部署重置）、实现自动暂停 + 管理员手动恢复开关。
 
 ### 5.6 GitHub 历史热门 AI 仓库（P0, v1.1）
 
@@ -1017,7 +1039,7 @@ NLP / recommendation / predictive / analytics / data science
 | Render | Render Inc. | 后端托管 | ✅ 是 | API 服务，免费版 15 分钟无流量休眠 |
 | Supabase PostgreSQL | Supabase Inc. | 数据库 | ✅ 是 | 免费版 500MB 存储，SSL 连接 |
 | UptimeRobot | UptimeRobot Inc. | 保活监控 | ✅ 是 | 每 5 分钟 ping /api/health |
-| 腾讯云 TMT | 腾讯云 | 英译中 | ✅ 是（v1.1） | 标准版免费 500 万字符/月。v1.1 初用百度翻译（免费额度 850K/月已于 2026-06-04 耗尽），后切换至腾讯 TMT。详见 §5.5 |
+| 腾讯云 TMT | 腾讯云 | 英译中 | ✅ 是（v1.1） | 标准版免费 500 万字符/月。v1.1 初用百度翻译（免费额度 850K/月已于 2026-06-04 耗尽），后切换至腾讯 TMT。v1.1.2 配额迁移 DB，实现自动暂停 + 管理员开关。详见 §5.5 |
 | Product Hunt | Product Hunt | RSS 数据源 | ✅ 是（v1.1） | `https://www.producthunt.com/feed` |
 | Hacker News | Y Combinator | RSS 数据源 | ✅ 是（v1.1） | `https://news.ycombinator.com/rss` |
 | OpenAI Blog | OpenAI | RSS 数据源 | ❌ 否（v1.1） | `https://openai.com/blog/rss/`，更新不定期 |
@@ -1233,6 +1255,17 @@ NLP / recommendation / predictive / analytics / data science
 | 热度评分上调 | 优化 | gitHubBase floor 20→35，分档全面上调；今日星数加成（上限 +15） |
 | 前端默认排序调整 | 优化 | 默认展示"最新情报"（原"高热爆料"），中文筛选默认关闭 |
 | 用户偏好持久化 | 优化 | 筛选器选择 + 中文开关存入 localStorage，刷新保持 |
+
+#### V1.1.2（2026-06-05）
+
+| 变更 | 类型 | 说明 |
+|------|------|------|
+| 配额迁移 PostgreSQL | 架构 | translation_quota.json（Render 临时文件系统 → DB translation_usage 表，消除部署重置）|
+| 分级策略收紧 | 优化 | ≥80 全翻、≥60 仅标题、<60 跳过；官方博客改为仅翻标题 |
+| 自动暂停机制 | 功能 | 腾讯 API 返回额度耗尽错误时自动暂停，队列停止扫描 |
+| 管理员开关 | 管理 | Admin 页面翻译状态卡片（运行中/已暂停 + 用量进度条 + 按钮），DB 持久化 |
+| 队列上限 | 优化 | 单次最多处理 400 条，逐条检查 isQuotaExhausted() |
+| Schema 幂等修复 | Bugfix | 注释掉每次部署重置 ''→NULL 的 UPDATE 语句 |
 
 ### C. 竞品参考列表
 | 产品 | 网址 | 参考价值 |

@@ -42,6 +42,7 @@ let server: ReturnType<typeof app.listen>;
 let cronTask: ReturnType<typeof cron.schedule> | null = null;
 let evergreenCron: ReturnType<typeof cron.schedule> | null = null;
 let translateCron: ReturnType<typeof cron.schedule> | null = null;
+let decayCron: ReturnType<typeof cron.schedule> | null = null;
 
 // 启动
 async function start() {
@@ -59,15 +60,30 @@ async function start() {
       console.log('[Cron] Scheduled fetch started...');
       try {
         await fetchAll();
-        // 置顶爆料热度衰减
-        await decayPinnedPosts();
-        // V1.1: 抓取完成后异步执行翻译
-        runTranslationQueue();
       } catch (err) {
         console.error('[Cron] Fetch error:', err);
       }
+      // 置顶衰减独立于 fetchAll 运行，避免 fetch 失败导致衰减被跳过
+      try {
+        await decayPinnedPosts();
+      } catch (err) {
+        console.error('[Cron] Decay error:', err);
+      }
+      try {
+        runTranslationQueue();
+      } catch (err) {
+        console.error('[Cron] Translation error:', err);
+      }
     });
     console.log('[Server] Cron scheduled: 8:00, 12:00, 18:00, 22:00 UTC+8');
+    // 额外定时：每 6 小时独立运行置顶衰减（offset 错开主 cron，确保更及时衰减）
+    const decayCron = cron.schedule('30 2,8,14,20 * * *', async () => {
+      try {
+        await decayPinnedPosts();
+      } catch (err) {
+        console.error('[Cron] Decay (extra) error:', err);
+      }
+    });
 
     // V1.1: 常青榜每周一 8:00 UTC+8（cron 使用 UTC：0 0 = 周一 0:00 UTC = 8:00 UTC+8）
     evergreenCron = cron.schedule('0 0 * * 1', async () => {
@@ -119,6 +135,7 @@ function gracefulShutdown(signal: string) {
   cronTask?.stop();
   evergreenCron?.stop();
   translateCron?.stop();
+  decayCron?.stop();
 
   if (server) {
     server.close(() => {
