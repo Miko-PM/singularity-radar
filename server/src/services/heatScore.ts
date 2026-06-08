@@ -213,18 +213,18 @@ export async function reheatAll(): Promise<number> {
   return count;
 }
 
-/** 定时衰减置顶管理员爆料的热度 */
+/** 定时衰减管理员爆料的热度（含置顶和非置顶，避免热度永久冻结） */
 export async function decayPinnedPosts(): Promise<number> {
   const res = await query<Article>(
     `SELECT a.* FROM articles a
      JOIN sources s ON a.source_id = s.id
-     WHERE s.slug = 'admin_post' AND a.is_pinned = true`
+     WHERE s.slug = 'admin_post'`
   );
   for (const article of res.rows) {
     await scoreArticle(article);
   }
   if (res.rows.length > 0) {
-    console.log(`[Heat] Decayed ${res.rows.length} pinned posts`);
+    console.log(`[Heat] Decayed ${res.rows.length} admin posts`);
   }
   return res.rows.length;
 }
