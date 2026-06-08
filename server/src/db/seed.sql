@@ -11,13 +11,13 @@ INSERT INTO sources (name, slug, feed_url, category, update_interval, fallback_u
   ('36氪', '36kr', 'https://36kr.com/feed', 'news', 'daily', '[]', true),
   ('雷峰网', 'leiphone', 'https://www.leiphone.com/feed', 'news', 'daily', '[]', true),
   ('Lenny''s Podcast', 'lennys_podcast', 'https://www.lennysnewsletter.com/feed', 'podcast', 'weekly', '[]', true),
-  ('硅谷101', 'sv101', 'https://sv101.fireside.fm/rss', 'podcast', 'weekly', '["https://feeds.fireside.fm/sv101/rss"]', true),
+  ('硅谷101', 'sv101', 'https://feeds.fireside.fm/sv101/rss', 'podcast', 'weekly', '["https://sv101.fireside.fm/rss"]', true),
   ('管理员爆料', 'admin_post', '', 'news', 'daily', '[]', true),
   -- V1.1: 新增数据源
   ('Product Hunt', 'product_hunt', 'https://www.producthunt.com/feed', 'opensource', 'daily', '[]', true),
   ('Hacker News', 'hacker_news', 'https://news.ycombinator.com/rss', 'news', 'daily', '[]', true),
-  ('OpenAI Blog', 'openai_blog', 'https://openai.com/blog/rss.xml', 'news', 'daily', '[]', true),
-  ('Google AI Blog', 'google_ai_blog', 'https://blog.google/technology/ai/rss', 'news', 'daily', '[]', true),
+  ('OpenAI Blog', 'openai_blog', 'https://openai.com/news/rss.xml', 'news', 'daily', '["https://openai.com/blog/rss.xml"]', true),
+  ('Google AI Blog', 'google_ai_blog', 'https://blog.google/innovation-and-ai/technology/ai/rss/', 'news', 'daily', '["https://blog.google/technology/ai/rss"]', true),
   ('Hugging Face Blog', 'huggingface_blog', 'https://huggingface.co/blog/feed.xml', 'news', 'daily', '[]', true),
   -- V1.1: GitHub 历史仓库
   ('GitHub 历史仓库（常青榜）', 'github_evergreen', '', 'opensource', 'weekly', '[]', true),
@@ -110,3 +110,11 @@ INSERT INTO tag_keywords (tag_name, keyword) VALUES
   ('推理', 'chain-of-thought'),
   ('推理', '思维链')
 ON CONFLICT (keyword) DO NOTHING;
+
+-- ============================================
+-- V1.1.2: 迁移 — 更新已有数据源的 feed_url / fallback_urls
+-- 修复：避免重定向，使用稳定的最终 URL
+-- ============================================
+UPDATE sources SET feed_url = 'https://feeds.fireside.fm/sv101/rss', fallback_urls = '["https://sv101.fireside.fm/rss"]' WHERE slug = 'sv101' AND feed_url <> 'https://feeds.fireside.fm/sv101/rss';
+UPDATE sources SET feed_url = 'https://openai.com/news/rss.xml', fallback_urls = '["https://openai.com/blog/rss.xml"]' WHERE slug = 'openai_blog' AND feed_url <> 'https://openai.com/news/rss.xml';
+UPDATE sources SET feed_url = 'https://blog.google/innovation-and-ai/technology/ai/rss/', fallback_urls = '["https://blog.google/technology/ai/rss"]' WHERE slug = 'google_ai_blog' AND feed_url <> 'https://blog.google/innovation-and-ai/technology/ai/rss/';
