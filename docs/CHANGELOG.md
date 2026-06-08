@@ -59,6 +59,20 @@ Singularity Radar 正式上线。AI 资讯聚合平台，覆盖 GitHub Trending�
 - 长青榜封顶未覆盖批量重算：`reheatAll()` 和 `scoreArticle()` 均增加 evergreen cap 检查
 - 36氪非 AI 内容泄漏：数据库清除 139 条财经噪音数据，增强过滤正则
 
+## V1.1.3 — 2026-06-08
+
+数据源抓取修复——更新 feed_url 避免重定向、补充生产库缺少的 fallback URLs、迁移 SQL 自动修复已有记录。
+
+### 修复
+- **sv101 生产库缺少 fallback URL**：seed.sql 中 `ON CONFLICT DO NOTHING` 导致已有记录不被更新，生产库 `fallback_urls = '[]'`。新增迁移 SQL（startup 自动执行），修复所有已有数据源的 feed_url / fallback_urls
+- **sv101 feed_url 重定向**：`sv101.fireside.fm/rss` → 301 跳转到 `feeds.fireside.fm/sv101/rss`，交换主/备用 URL 避免每次经过重定向
+- **OpenAI Blog feed_url 重定向**：`openai.com/blog/rss.xml` → 307 跳转到 `/news/rss.xml`，改为直连最终 URL
+- **Google AI Blog feed_url 重定向**：`blog.google/technology/ai/rss` → 308 跳转，改用最终 URL
+
+### 变更
+- seed.sql 新增迁移段：启动时自动执行 `UPDATE` 已有记录的 feed_url / fallback_urls
+- 三源 feed_url 改为最终稳定 URL，原 URL 降为 fallback
+
 ## V1.1.2 — 2026-06-05
 
 翻译专项修复——配额持久化、策略收紧、自动暂停、管理员开关。

@@ -1,6 +1,6 @@
 # Session Context
 
-最后更新：2026-06-05
+最后更新：2026-06-08
 
 > 维护方式：每次结束一段工作或切换任务时，Claude 更新此文件。
 > 目的是在会话中断（关机、关窗口、超时压缩）后快速恢复上下文。
@@ -9,14 +9,20 @@
 
 ## 当前状态
 
-- **V1.1.1 已发布上线**（2026-06-04 部署），**V1.1.1 hotfix 已部署**（2026-06-05）
-- 修复了翻译引擎切换（百度→腾讯 TMT）、数据源打散排序、GitHub Trending 排序霸榜、热度评分偏低、前端默认排序等线上问题
-- 翻译功能已自动暂停（腾讯 TMT 月度额度耗尽），等待 7/1 重置
-- 对应文档均已更新（PRD、RELEASE_NOTES、RETROSPECTIVE、CONTEXT）
+- **V1.1.3 已部署上线**（2026-06-08）
+- 修复了 3 个数据源的 feed URL 重定向问题（sv101/openai_blog/google_ai_blog）
+- 新增种子数据迁移机制（seed.sql 末尾迁移段，startup 自动执行）
+- 翻译功能仍暂停（腾讯 TMT 月度额度耗尽，等待 7/1 重置）
 
 ---
 
 ## 已完成
+
+### 2026-06-08 V1.1.3 数据源抓取修复
+- **sv101 fallback_urls 修复**：生产库缺少备用 URL，新增迁移 SQL 自动修复
+- **三源 feed URL 修正**：sv101(301)、openai_blog(307)、google_ai_blog(308) 改用最终稳定 URL
+- **种子数据迁移机制**：seed.sql 末尾新增迁移段，startup 时自动执行 UPDATE 修复已有记录
+- **文档更新**：CHANGELOG/RELEASE_NOTES/RETROSPECTIVE/CONTEXT 四处同步
 
 ### 2026-06-05 V1.1.1 翻译热修复（续）
 - **配额存储迁移**：`translation_quota.json`（Render 临时文件系统）→ PostgreSQL `translation_usage` 表
@@ -62,7 +68,9 @@
 
 - [ ] V1.2 功能规划（如有）
 - [ ] 监控线上运行稳定性
-- [ ] 观察腾讯 TMT 月度配额使用情况
+- [ ] 观察腾讯 TMT 月度配额使用情况（当前暂停，7/1 重置）
+- [ ] sources 表新增 `last_fetched_at` 列，准确追踪抓取时间（当前 `last_fetch` 源自 `MAX(articles.created_at)`，不能区分"空结果"和"抓取失败"）
+- [ ] 新增源 checklist 正式化（feed URL 无重定向、字段完整性、fallback URL、slug 映射、base_score）
 
 ---
 

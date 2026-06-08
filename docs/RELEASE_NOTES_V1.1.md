@@ -1,7 +1,7 @@
 # Singularity Radar V1.1 发布说明
 
-**发布日期：** 2026-06-02（V1.1）/ 2026-06-04（V1.1.1）/ 2026-06-05（V1.1.2）
-**版本：** v1.1.2（server + client）
+**发布日期：** 2026-06-02（V1.1）/ 2026-06-04（V1.1.1）/ 2026-06-05（V1.1.2）/ 2026-06-08（V1.1.3）
+**版本：** v1.1.3（server + client）
 
 ---
 
@@ -173,6 +173,44 @@ V1.1.2 是翻译专项修复版本，重点解决：配额存储迁移（Render 
 - 默认排序：从"高热爆料"改为"最新情报"
 - 中文筛选：默认关闭（原默认开启）
 - 用户偏好持久化：排序方式和中文开关均存入 `localStorage`
+
+---
+
+## V1.1.3 热修复（2026-06-08）
+
+### 背景
+
+部署上线后，硅谷101（sv101）自 5/29 起无新数据，Product Hunt、OpenAI Blog、Google AI Blog 数据陈旧。排查发现三重问题：seed.sql 的 `ON CONFLICT DO NOTHING` 导致生产库缺少 sv101 的备用 URL；三源的 feed URL 存在 301/307/308 重定向，增加抓取延迟和失败风险。
+
+### 修复内容
+
+**1. 生产库缺少 sv101 fallback URL**
+
+| 维度 | 说明 |
+|------|------|
+| **现象** | sv101 `last_fetch` 停留在 5/29，生产库 `fallback_urls = '[]'` |
+| **原因** | seed.sql 的 `ON CONFLICT (slug) DO NOTHING` 只对新库有效，已有记录不更新。V1.1 上线时 seed.sql 中的 sv101 fallback 变更没有被应用到生产 |
+| **解决** | 在 seed.sql 末尾新增迁移段，startup 时自动执行 `UPDATE sources SET feed_url/fallback_urls WHERE slug = 'sv101'` |
+
+**2. 三源 feed URL 重定向**
+
+| 数据源 | 原 URL | 状态 | 目标 URL |
+|--------|--------|------|---------|
+| sv101 | `sv101.fireside.fm/rss` | 301 → | `feeds.fireside.fm/sv101/rss` |
+| OpenAI Blog | `openai.com/blog/rss.xml` | 307 → | `openai.com/news/rss.xml` |
+| Google AI Blog | `blog.google/technology/ai/rss` | 308 → | `blog.google/innovation-and-ai/technology/ai/rss/` |
+
+**3. 新增迁移机制**
+
+seed.sql 中的迁移 SQL 在每次 startup 时运行。使用条件 `WHERE feed_url <> '...'` 确保幂等性——同一语句第二次执行不产生变化。
+
+### 影响
+
+- **硅谷101**: 恢复数据接入能力（最新节目 5/25，播客周更，无新内容属于正常）
+- **OpenAI Blog**: feed 恢复（最新文章 6/4，无新内容属于正常）
+- **Google AI Blog**: feed 恢复（最新文章 6/5）
+- **Product Hunt**: 已正常工作（6/8 已抓取）
+- **HuggingFace/GitHub 新锐榜**: 前一轮修复已验证通过
 
 ---
 
